@@ -180,3 +180,24 @@ export const TIPO_PDF = "application/pdf";
 
 // Enlace para abrir en Word de escritorio
 export const enlaceWordEscritorio = (webUrl: string) => `ms-word:ofe|u|${webUrl}`;
+
+// Archivos de una carpeta (nombre e id), o vacío si la carpeta no existe
+export async function listarCarpeta(ruta: string): Promise<{ id: string; name: string }[]> {
+  const carpeta = await elementoPorRuta(ruta);
+  if (!carpeta) return [];
+  const drive = await obtenerDrive();
+  const r = await graph(`/drives/${drive}/items/${carpeta.id}/children?$select=id,name&$top=999`);
+  return ((await r.json()).value ?? []) as { id: string; name: string }[];
+}
+
+// Borra un archivo (va a la papelera de reciclaje de SharePoint)
+export async function eliminarElemento(id: string): Promise<void> {
+  const drive = await obtenerDrive();
+  await graph(`/drives/${drive}/items/${id}`, { method: "DELETE" });
+}
+
+export const TIPO_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+export function rutaCopias(): string {
+  return (process.env.SP_COPIAS ?? "CARPA DIEM/00. CRM PRUEBAS/COPIAS DE SEGURIDAD").replace(/\/+$/, "");
+}

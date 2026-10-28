@@ -11,6 +11,7 @@ import { HistorialDialogo } from "@/components/historial-dialogo";
 import { useTablaEnVivo } from "@/hooks/use-tabla-en-vivo";
 import { crearClienteNavegador } from "@/lib/supabase/client";
 import { codigoPresupuesto } from "@/lib/formato";
+import { exportarAhora } from "@/lib/acciones-copias";
 
 type Perfil = { id: string; email: string; nombre: string | null; rol: "admin" | "usuario"; activo: boolean };
 type Ajustes = { dominios_permitidos: string[] };
@@ -196,6 +197,43 @@ export function AjustesAdmin({ miId }: { miId: string }) {
           <Button type="submit" variant="outline">Añadir año</Button>
         </form>
       </Seccion>
+      <Seccion
+        titulo="Copias de seguridad"
+        texto="Cada lunes a las 7:00 se guarda un Excel con todo el CRM (Presupuestos, Eventos, Leads, Cobros y Material) en SharePoint. Se conservan las 12 últimas semanas. Es una foto para consultar: no se edita."
+      >
+        <CopiasDeSeguridad />
+      </Seccion>
+    </div>
+  );
+}
+
+function CopiasDeSeguridad() {
+  const [ocupado, setOcupado] = useState(false);
+  const [ultima, setUltima] = useState<{ nombre: string; webUrl: string } | null>(null);
+
+  async function exportar() {
+    setOcupado(true);
+    const r = await exportarAhora();
+    setOcupado(false);
+    if (!r.ok) return toast.error(r.error);
+    setUltima(r);
+    toast.success(`Copia guardada: ${r.nombre} (${r.filas} filas)`);
+  }
+
+  return (
+    <div className="grid gap-3">
+      <div className="flex flex-wrap gap-2">
+        <Button disabled={ocupado} onClick={exportar}>{ocupado ? "Exportando…" : "Exportar ahora"}</Button>
+        <Button variant="outline" render={<a href="/api/copias/descargar" />}>Descargar Excel</Button>
+      </div>
+      {ultima && (
+        <p className="text-sm">
+          Guardada <a href={ultima.webUrl} target="_blank" rel="noreferrer">{ultima.nombre}</a>
+        </p>
+      )}
+      <p className="text-xs text-muted-foreground">
+        Mientras dure la demo, las copias van a “00. CRM PRUEBAS/COPIAS DE SEGURIDAD”. En producción irán a “00. CRM/COPIAS DE SEGURIDAD”.
+      </p>
     </div>
   );
 }

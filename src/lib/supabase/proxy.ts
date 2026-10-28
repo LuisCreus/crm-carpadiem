@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-const RUTAS_PUBLICAS = ["/login", "/auth"];
+// /api/copias/semanal la llama Vercel sin sesión: se protege con CRON_SECRET
+const RUTAS_PUBLICAS = ["/login", "/auth", "/api/copias/semanal"];
 
 // Refresca la sesión en cada petición y manda a /login a quien no la tenga.
 export async function actualizarSesion(request: NextRequest) {

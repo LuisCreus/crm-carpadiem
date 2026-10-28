@@ -13,8 +13,10 @@ CRM web de CARPADIEM IBÉRICA S.L. para gestionar leads, presupuestos (con la pl
 | 2 | Login, modelo de datos, tiempo real, roles, historial y papelera | Hecha |
 | 3 | Presupuestos, leads, eventos, planificación e importación de prueba | Hecha |
 | 4 | Word y SharePoint (en `00. CRM PRUEBAS`) | Hecha |
-| 5 | Montajes, hoja de montaje, material, inventario, avisos, Inicio y búsqueda | **En curso** |
-| 6–9 | Móvil (PWA), copias de seguridad, demo en línea, producción | Pendiente |
+| 5 | Montajes, hoja de montaje, material, inventario, avisos, Inicio y búsqueda | Hecha |
+| 6 | Móvil: PWA instalable y diseño en vertical | Hecha |
+| 7 | Copias de seguridad semanales en Excel | **En curso** |
+| 8–9 | Demo con el equipo, producción | Pendiente (la demo ya está en https://crm-carpadiem.vercel.app) |
 
 ## Piezas
 
@@ -110,6 +112,12 @@ supabase/
 - **Cache Components de Next.js desactivado:** el CRM es una app con sesión y los datos llegan en vivo desde Supabase, así que no aporta nada y complica el código.
 - **Login a través de Supabase Auth (proveedor Azure):** así la base de datos sabe quién es cada usuario y aplica los permisos fila a fila.
 - **SharePoint con permiso `Sites.Selected`:** el CRM solo podrá tocar el sitio GrupoGS (se configura en la Fase 4).
+
+## Copias de seguridad
+
+- **Cada lunes a las 6:00 UTC** (7:00 en invierno y 8:00 en verano, hora de Madrid) Vercel llama a `/api/copias/semanal` (ver `vercel.json`). Se genera `CRM CARPA DIEM AAAA-MM-DD.xlsx` con las hojas Presupuestos, Eventos, Leads, Cobros y Material, y se guarda en `SP_COPIAS`. Se conservan las 12 últimas; las anteriores van a la papelera de reciclaje de SharePoint.
+- **Ajustes → Copias de seguridad** (solo administrador): "Exportar ahora" y "Descargar Excel".
+- **Base de datos:** el plan gratuito de Supabase **no hace copias automáticas**. El plan Pro (unos 25 $/mes) guarda una copia diaria de los últimos **7 días**; con el complemento PITR se puede volver a cualquier momento (con coste extra). Lo decidiremos en la Fase 9.
 
 ## Secretos
 
