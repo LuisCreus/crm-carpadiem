@@ -15,7 +15,7 @@ CRM web de CARPADIEM IBÉRICA S.L. para gestionar leads, presupuestos (con la pl
 | 4 | Word y SharePoint (en `00. CRM PRUEBAS`) | Hecha |
 | 5 | Montajes, hoja de montaje, material, inventario, avisos, Inicio y búsqueda | Hecha |
 | 6 | Móvil: PWA instalable y diseño en vertical | Hecha |
-| 7 | Copias de seguridad semanales en Excel | **En curso** |
+| 7 | Copias de seguridad semanales en Excel | Hecha |
 | 8–9 | Demo con el equipo, producción | Pendiente (la demo ya está en https://crm-carpadiem.vercel.app) |
 
 ## Piezas
