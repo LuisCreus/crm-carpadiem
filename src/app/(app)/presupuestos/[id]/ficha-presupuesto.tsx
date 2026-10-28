@@ -362,7 +362,7 @@ function AccionesMovil({ contacto, versionPdf }: { contacto?: Contacto; versionP
   const boton = "flex min-h-14 flex-1 flex-col items-center justify-center gap-1 rounded-xl border bg-card text-xs font-medium text-foreground";
   return (
     <div className="mb-5 flex gap-2 md:hidden">
-      <button type="button" className={cn(boton, "border-primary bg-primary text-primary-foreground")} disabled={!versionPdf} onClick={compartir}>
+      <button type="button" className={cn(boton, versionPdf ? "border-primary bg-primary text-primary-foreground" : "text-muted-foreground")} disabled={!versionPdf} onClick={compartir}>
         <Share2 className="size-5" aria-hidden /> {versionPdf ? "Compartir PDF" : "Sin PDF"}
       </button>
       {contacto?.telefono && (
