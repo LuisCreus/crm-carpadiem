@@ -5,8 +5,11 @@ import { hacerCopia } from "@/lib/copias-servidor";
 // Copia semanal automática: la llama Vercel cada lunes (ver vercel.json).
 // Solo responde a quien traiga la clave CRON_SECRET.
 export async function GET(request: NextRequest) {
-  const secreto = process.env.CRON_SECRET;
-  if (!secreto || request.headers.get("authorization") !== `Bearer ${secreto}`) {
+  const secreto = process.env.CRON_SECRET?.trim();
+  if (!secreto) {
+    return NextResponse.json({ error: "Falta CRON_SECRET en la configuración del servidor" }, { status: 500 });
+  }
+  if (request.headers.get("authorization") !== `Bearer ${secreto}`) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
   try {
