@@ -19,6 +19,10 @@ const PREPARACION = `
   grant usage on schema auth to authenticated, anon;
   grant execute on function auth.uid() to authenticated, anon;
   create publication supabase_realtime;
+  create schema storage;
+  create table storage.buckets (id text primary key, name text, public boolean);
+  create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text);
+  alter table storage.objects enable row level security;
 `;
 
 export async function crearBaseDePrueba() {

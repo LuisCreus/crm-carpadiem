@@ -47,6 +47,7 @@ export type Presupuesto = PresupuestoLista & {
   enviado_at: string | null;
   version_enviada: number | null;
   sp_carpeta_url: string | null;
+  sp_carpeta_ruta: string | null;
   intermediario: { id: string; nombre: string } | null;
   cliente: { id: string; nombre: string; tipo_cliente: string | null } | null;
 };
@@ -58,6 +59,11 @@ export type Version = {
   id: string;
   version: number;
   importe: number | null;
+  nombre_archivo: string | null;
+  docx_item_id: string | null;
+  docx_ruta: string | null;
+  pdf_item_id: string | null;
+  pdf_storage: string | null;
   pdf_url: string | null;
   docx_url: string | null;
   pdf_generado_at: string | null;

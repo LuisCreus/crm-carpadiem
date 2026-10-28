@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Copy, FileText, Mail, MessageCircle, Phone, Plus, Trash2 } from "lucide-react";
+import { Copy, Mail, MessageCircle, Phone, Plus, Trash2 } from "lucide-react";
 import { EtiquetaEstado, Etiqueta, CLASE_CONFIRMADO, CLASE_SEGURO } from "@/components/etiqueta-estado";
 import { HistorialDialogo } from "@/components/historial-dialogo";
 import { Button } from "@/components/ui/button";
@@ -18,10 +18,11 @@ import {
 } from "@/lib/datos/tipos";
 import { formatoEuros, formatoFecha, formatoFechaHora, formatoPorcentaje } from "@/lib/formato";
 import {
-  ESTADOS, ESTADOS_ACEPTADOS, ESTADOS_MANUALES, diaSemana, importeReserva, nombreArchivoPresupuesto,
-  rutaCarpetaCliente, textoFechaEvento, type EstadoPresupuesto,
+  ESTADOS, ESTADOS_ACEPTADOS, ESTADOS_MANUALES, diaSemana, importeReserva,
+  textoFechaEvento, type EstadoPresupuesto,
 } from "@/lib/negocio";
 import { DialogoAceptar, DialogoCobro, DialogoContacto, DialogoDatos, DialogoRechazar } from "./dialogos";
+import { TarjetaDocumento } from "./tarjeta-documento";
 
 type Datos = {
   p: Presupuesto;
@@ -137,12 +138,6 @@ export function FichaPresupuesto({ id }: { id: string }) {
     else toast.success(`V${String(ultimaVersion).padStart(2, "0")} marcada como enviada ✓`);
   }
 
-  async function nuevaVersion() {
-    const { data, error } = await sb.rpc("nueva_version", { p_id: p.id });
-    if (error) toast.error(error.message);
-    else toast.success(`V${String(data).padStart(2, "0")} creada ✓`);
-  }
-
   async function borrarCobro(c: Cobro) {
     if (!window.confirm(`¿Borrar el cobro de ${formatoEuros(c.importe)} del ${formatoFecha(c.fecha)}?`)) return;
     try {
@@ -220,38 +215,7 @@ export function FichaPresupuesto({ id }: { id: string }) {
 
       <div className="grid items-start gap-6 lg:grid-cols-2">
         <div className="grid gap-6">
-          <Tarjeta titulo="Documento" accion={<span className="text-xs text-muted-foreground">Word y PDF llegan en la Fase 4</span>}>
-            <div className="flex items-center gap-3.5 rounded-lg border bg-background p-3.5">
-              <div className="flex h-12 w-10 items-center justify-center rounded-md bg-[#EEF4F7] text-[#2F5D70]">
-                <FileText className="size-5" aria-hidden />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold">
-                  {nombreArchivoPresupuesto(p.numero, cliente, ultimaVersion, "docx").replace(/\.docx$/, "")}
-                </div>
-                <div className="truncate text-[13px] text-muted-foreground" title={rutaCarpetaCliente(p.fecha_precision, p.fecha_evento, cliente)}>
-                  {rutaCarpetaCliente(p.fecha_precision, p.fecha_evento, cliente)}
-                </div>
-              </div>
-            </div>
-            <div className="mt-3.5 flex flex-wrap gap-2">
-              <Button variant="outline" disabled>Abrir en Word</Button>
-              <Button variant="outline" onClick={nuevaVersion}>Crear V{String(ultimaVersion + 1).padStart(2, "0")}</Button>
-              {p.estado !== "borrador" && <Button variant="outline" onClick={marcarEnviado}>Marcar V{String(ultimaVersion).padStart(2, "0")} como enviada</Button>}
-            </div>
-            <ul className="mt-4">
-              {versiones.map((v) => (
-                <li key={v.id} className="flex items-center gap-3 border-t py-2.5 text-sm">
-                  <span className="w-9 font-semibold">V{String(v.version).padStart(2, "0")}</span>
-                  <span className="flex-1 text-muted-foreground">
-                    Creada {formatoFecha(v.created_at)}{v.enviado_at && ` · enviada ${formatoFecha(v.enviado_at)}`}
-                  </span>
-                  <span>{formatoEuros(v.importe)}</span>
-                  {p.version_enviada === v.version && <Etiqueta className="bg-[#EEF4F7] text-[#2F5D70]">Enviada</Etiqueta>}
-                </li>
-              ))}
-            </ul>
-          </Tarjeta>
+          <TarjetaDocumento p={p} versiones={versiones} />
 
           <Tarjeta titulo="Datos" accion={<Button variant="outline" size="sm" onClick={() => setDialogo("datos")}>Editar</Button>}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
@@ -326,7 +290,7 @@ export function FichaPresupuesto({ id }: { id: string }) {
             )}
           </Tarjeta>
 
-          <Tarjeta titulo="Envío">
+          <Tarjeta titulo="Envío" accion={p.estado !== "borrador" && <Button variant="outline" size="sm" onClick={marcarEnviado}>Marcar V{String(ultimaVersion).padStart(2, "0")} como enviada</Button>}>
             {p.enviado_at ? (
               <p className="text-sm">V{String(p.version_enviada).padStart(2, "0")} marcada como enviada el {formatoFechaHora(p.enviado_at)}</p>
             ) : (

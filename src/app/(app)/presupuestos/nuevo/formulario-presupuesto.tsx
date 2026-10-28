@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useListas } from "@/hooks/use-listas";
 import { crearClienteNavegador } from "@/lib/supabase/client";
 import { uno } from "@/lib/datos/tipos";
+import { crearDocumento, estadoSharePoint } from "@/lib/documentos";
 import type { PrecisionFecha } from "@/lib/negocio";
 import { cn } from "@/lib/utils";
 
@@ -160,6 +161,19 @@ export function FormularioPresupuesto({ nombreUsuario, leadId, duplicarId, opcio
     }
     const creado = data as { id: string; codigo: string };
     toast.success(`${creado.codigo} creado ✓`);
+
+    // Carpeta + Word en SharePoint (si falla, el presupuesto ya está creado y se puede reintentar)
+    const sp = await estadoSharePoint().catch(() => null);
+    if (sp?.configurado) {
+      const id = toast.loading("Creando la carpeta y el Word…");
+      const doc = await crearDocumento(creado.id, duplicarId);
+      if (doc.ok) {
+        toast.success(`${doc.nombre} creado ✓ · abriendo Word…`, { id });
+        window.location.href = doc.escritorio;
+      } else {
+        toast.error(`El presupuesto está creado, pero el Word no: ${doc.error}`, { id });
+      }
+    }
     router.push(`/presupuestos/${creado.id}`);
   }
 
