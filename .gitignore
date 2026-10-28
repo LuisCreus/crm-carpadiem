@@ -19,3 +19,9 @@ supabase/.temp/
 Thumbs.db
 desktop.ini
 *.log
+
+# Next.js / TypeScript
+next-env.d.ts
+*.tsbuildinfo
+*.pem
+npm-debug.log*
