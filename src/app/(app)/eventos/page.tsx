@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { Proximamente } from "@/components/proximamente";
+import { ListaEventos } from "./lista-eventos";
 
 export const metadata: Metadata = { title: "Eventos" };
 
-export default function Page() {
-  return <Proximamente titulo="Eventos" fase={3} texto="Eventos creados al aceptar un presupuesto, con montaje y material." />;
+export default function EventosPage() {
+  return <ListaEventos />;
 }

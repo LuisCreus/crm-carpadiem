@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
-import { Proximamente } from "@/components/proximamente";
+import { obtenerUsuario } from "@/lib/auth";
+import { TableroLeads } from "./tablero-leads";
 
 export const metadata: Metadata = { title: "Leads" };
 
-export default function Page() {
-  return <Proximamente titulo="Leads" fase={3} texto="Alta rápida de leads, vista Kanban y tabla con filtros." />;
+export default async function LeadsPage() {
+  const usuario = await obtenerUsuario();
+  return <TableroLeads nombreUsuario={usuario.nombre} />;
 }

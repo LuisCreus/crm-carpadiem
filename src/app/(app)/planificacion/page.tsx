@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { Proximamente } from "@/components/proximamente";
+import { Planificacion } from "./planificacion";
 
 export const metadata: Metadata = { title: "Planificación" };
 
-export default function Page() {
-  return <Proximamente titulo="Planificación" fase={3} texto="Los 12 meses del año con los eventos cerrados y los presupuestos pendientes." />;
+export default async function PlanificacionPage({ searchParams }: PageProps<"/planificacion">) {
+  const { mes } = await searchParams;
+  return <Planificacion mesDetalle={typeof mes === "string" && /^\d{4}-\d{2}$/.test(mes) ? mes : undefined} />;
 }
