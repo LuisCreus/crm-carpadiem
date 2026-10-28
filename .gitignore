@@ -25,3 +25,6 @@ next-env.d.ts
 *.tsbuildinfo
 *.pem
 npm-debug.log*
+
+# PDFs de comparación de plantillas (contienen datos de ejemplo de clientes)
+comparacion-plantillas/

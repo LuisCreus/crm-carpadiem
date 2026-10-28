@@ -221,12 +221,14 @@ function rellenarEnDocumento(doc: Document, valores: Partial<Record<Etiqueta, st
 
 const PARTES = /^word\/(document|header\d*|footer\d*)\.xml$/;
 
+// Algunos Word guardan las partes con BOM (U+FEFF) delante de la declaración XML
+const leerXml = (xml: string) => new DOMParser().parseFromString(xml.replace(/^﻿/, ""), "text/xml");
+
 async function transformar(docx: Uint8Array | ArrayBuffer, fn: (doc: Document) => Etiqueta[]) {
   const zip = await JSZip.loadAsync(docx);
   const hechos = new Set<Etiqueta>();
   for (const nombre of Object.keys(zip.files).filter((n) => PARTES.test(n))) {
-    const xml = await zip.file(nombre)!.async("string");
-    const doc = new DOMParser().parseFromString(xml, "text/xml");
+    const doc = leerXml(await zip.file(nombre)!.async("string"));
     const r = fn(doc);
     if (r.length) {
       r.forEach((e) => hechos.add(e));
@@ -249,7 +251,7 @@ async function documentos(docx: Uint8Array | ArrayBuffer): Promise<Document[]> {
   const zip = await JSZip.loadAsync(docx);
   const res: Document[] = [];
   for (const nombre of Object.keys(zip.files).filter((n) => PARTES.test(n))) {
-    res.push(new DOMParser().parseFromString(await zip.file(nombre)!.async("string"), "text/xml"));
+    res.push(leerXml(await zip.file(nombre)!.async("string")));
   }
   return res;
 }

@@ -19,10 +19,10 @@ ${p(r("Nº Presupuesto: XX", true))}
 ${p(r("●   El pago del "), r("50% en depósito confirmará la reserva. El resto a pagar a la finalización del montaje."))}
 </w:body></w:document>`;
 
-async function docxDePrueba() {
+async function docxDePrueba(conBom = false) {
   const zip = new JSZip();
   zip.file("[Content_Types].xml", `<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`);
-  zip.file("word/document.xml", DOCUMENTO);
+  zip.file("word/document.xml", (conBom ? "﻿" : "") + DOCUMENTO);
   return zip.generateAsync({ type: "uint8array" });
 }
 
@@ -81,6 +81,11 @@ describe("controles de contenido en el Word", () => {
     const { total, reservaPct } = await leerImporte(await docxDePrueba());
     expect(total).toBe(13246);
     expect(reservaPct).toBe(50);
+  });
+
+  it("admite partes XML guardadas con BOM", async () => {
+    const { etiquetas } = await insertarControles(await docxDePrueba(true));
+    expect(etiquetas).toHaveLength(5);
   });
 
   it("entiende importes en formato español", () => {
