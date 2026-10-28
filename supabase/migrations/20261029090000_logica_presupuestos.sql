@@ -292,8 +292,13 @@ to authenticated;
 do $$
 begin
   if exists (select 1 from pg_available_extensions where name = 'pg_cron') then
-    create extension if not exists pg_cron;
-    perform cron.schedule('caducar-presupuestos', '0 3 * * *', 'select public.marcar_caducados()');
+    begin
+      create extension if not exists pg_cron;
+      perform cron.schedule('caducar-presupuestos', '0 3 * * *', 'select public.marcar_caducados()');
+    exception when others then
+      -- Si no se puede programar, no pasa nada: la app también caduca al abrir Presupuestos
+      raise notice 'pg_cron no disponible: %', sqlerrm;
+    end;
   end if;
 end;
 $$;
