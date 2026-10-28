@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { Search, SlidersHorizontal } from "lucide-react";
 import { Cabecera } from "@/components/cabecera";
 import { EstadoVacio } from "@/components/estado-vacio";
 import { EtiquetaEstado } from "@/components/etiqueta-estado";
@@ -59,6 +59,8 @@ export function ListaPresupuestos() {
   }, [datos, texto, estado, importeMin, importeMax, desde, listas.tiposEvento]);
 
   const hayFiltros = texto || estado || importeMin || importeMax || desde;
+  // En el móvil los filtros (salvo el buscador) se despliegan con un botón
+  const [verFiltros, setVerFiltros] = useState(false);
 
   return (
     <>
@@ -78,6 +80,10 @@ export function ListaPresupuestos() {
             onChange={(e) => setTexto(e.target.value)}
           />
         </label>
+        <Button variant="outline" className="md:hidden" aria-expanded={verFiltros} onClick={() => setVerFiltros(!verFiltros)}>
+          <SlidersHorizontal className="size-4" aria-hidden /> Filtros{(estado || importeMin || importeMax || desde) ? " ·" : ""}
+        </Button>
+        <div className={verFiltros ? "flex w-full flex-wrap items-end gap-2 md:contents" : "hidden md:contents"}>
         <select aria-label="Estado" className={`${claseSelect} h-9 w-44 bg-card`} value={estado}
           onChange={(e) => setEstado(e.target.value as EstadoPresupuesto | "")}>
           <option value="">Todos los estados</option>
@@ -91,6 +97,7 @@ export function ListaPresupuestos() {
           Evento desde
           <Input type="date" className="h-9 w-40 bg-card" value={desde} onChange={(e) => setDesde(e.target.value)} />
         </label>
+        </div>
         {hayFiltros && (
           <Button variant="ghost" size="sm" onClick={() => { setTexto(""); setEstado(""); setImporteMin(""); setImporteMax(""); setDesde(""); }}>
             Quitar filtros

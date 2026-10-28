@@ -93,6 +93,11 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /* Los elementos de una cuadrícula pueden encogerse: así un texto largo se
+     recorta (…) en vez de ensanchar la pantalla del móvil */
+  .grid > * {
+    min-width: 0;
+  }
   body {
     @apply bg-background text-foreground;
   }
