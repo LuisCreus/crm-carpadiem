@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Hanken_Grotesk, Instrument_Serif } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import { RegistrarSW } from "@/components/registrar-sw";
 import "./globals.css";
 
 // Tipografías de carpa-diem.com: Instrument Serif (títulos) y
@@ -16,11 +17,19 @@ const serif = Instrument_Serif({
 export const metadata: Metadata = {
   title: { default: "Carpa Diem CRM", template: "%s · Carpa Diem CRM" },
   description: "CRM de CARPADIEM IBÉRICA S.L.",
+  applicationName: "Carpa Diem",
+  // iPhone: al añadirla a la pantalla de inicio se abre a pantalla completa
+  appleWebApp: { capable: true, title: "Carpa Diem", statusBarStyle: "default" },
+  icons: { apple: "/icons/apple-touch-icon.png" },
+  formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {
   themeColor: "#FBFBFA",
   colorScheme: "light",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -29,6 +38,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full">
         {children}
         <Toaster position="top-center" />
+        <RegistrarSW />
       </body>
     </html>
   );

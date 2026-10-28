@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Copy, Mail, MessageCircle, Phone, Plus, Trash2 } from "lucide-react";
+import { Copy, Mail, MessageCircle, Phone, Plus, Share2, Trash2 } from "lucide-react";
 import { EtiquetaEstado, Etiqueta, CLASE_CONFIRMADO, CLASE_SEGURO } from "@/components/etiqueta-estado";
 import { HistorialDialogo } from "@/components/historial-dialogo";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import {
 } from "@/lib/negocio";
 import { DialogoAceptar, DialogoCobro, DialogoContacto, DialogoDatos, DialogoRechazar } from "./dialogos";
 import { TarjetaDocumento } from "./tarjeta-documento";
+import { cn } from "@/lib/utils";
 
 type Datos = {
   p: Presupuesto;
@@ -213,6 +214,8 @@ export function FichaPresupuesto({ id }: { id: string }) {
         </div>
       </div>
 
+      <AccionesMovil contacto={contactos[0]} versionPdf={versiones.find((v) => v.pdf_item_id || v.pdf_storage)} />
+
       <div className="grid items-start gap-6 lg:grid-cols-2">
         <div className="grid gap-6">
           <TarjetaDocumento p={p} versiones={versiones} />
@@ -337,5 +340,42 @@ export function FichaPresupuesto({ id }: { id: string }) {
       {dialogo === "datos" && <DialogoDatos abierto cerrar={cerrar} presupuesto={p} />}
       <DialogoContacto abierto={dialogo === "contacto"} cerrar={cerrar} clienteId={p.cliente_id} />
     </>
+  );
+}
+
+// Móvil: llamar, escribir y compartir el PDF con un toque
+function AccionesMovil({ contacto, versionPdf }: { contacto?: Contacto; versionPdf?: Version }) {
+  async function compartir() {
+    if (!versionPdf) return;
+    try {
+      const r = await fetch(`/api/pdf/${versionPdf.id}`);
+      if (!r.ok) throw new Error("No se pudo descargar el PDF");
+      const nombre = (versionPdf.nombre_archivo ?? "presupuesto").replace(/\.docx$/i, "") + ".pdf";
+      const archivo = new File([await r.blob()], nombre.replace(/\.pdf\.pdf$/, ".pdf"), { type: "application/pdf" });
+      if (navigator.canShare?.({ files: [archivo] })) await navigator.share({ files: [archivo], title: archivo.name });
+      else window.open(`/api/pdf/${versionPdf.id}?ver=1`, "_blank");
+    } catch (e) {
+      if (e instanceof Error && e.name !== "AbortError") toast.error(e.message);
+    }
+  }
+
+  const boton = "flex min-h-14 flex-1 flex-col items-center justify-center gap-1 rounded-xl border bg-card text-xs font-medium text-foreground";
+  return (
+    <div className="mb-5 flex gap-2 md:hidden">
+      <button type="button" className={cn(boton, "border-primary bg-primary text-primary-foreground")} disabled={!versionPdf} onClick={compartir}>
+        <Share2 className="size-5" aria-hidden /> {versionPdf ? "Compartir PDF" : "Sin PDF"}
+      </button>
+      {contacto?.telefono && (
+        <a className={boton} href={`tel:${contacto.telefono}`}><Phone className="size-5" aria-hidden /> Llamar</a>
+      )}
+      {contacto?.telefono && (
+        <a className={boton} href={`https://wa.me/${telefonoWhatsapp(contacto.telefono)}`} target="_blank" rel="noreferrer">
+          <MessageCircle className="size-5" aria-hidden /> WhatsApp
+        </a>
+      )}
+      {contacto?.email && (
+        <a className={boton} href={`mailto:${contacto.email}`}><Mail className="size-5" aria-hidden /> Email</a>
+      )}
+    </div>
   );
 }
