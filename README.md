@@ -10,7 +10,7 @@ CRM web de CARPADIEM IBÉRICA S.L. para gestionar leads, presupuestos (con la pl
 |---|---|---|
 | 0 | Cuentas, registro en Entra ID, repositorio | Hecha |
 | 1 | Diseño de Inicio, Ficha de presupuesto y Planificación | Hecha |
-| 2 | Login, modelo de datos, tiempo real, roles, historial y papelera | **En curso** |
+| 2 | Login, modelo de datos, tiempo real, roles, historial y papelera | Hecha |
 | 3–9 | Funcionalidad, Word/SharePoint, eventos, móvil, copias, demo, producción | Pendiente |
 
 ## Piezas
@@ -41,6 +41,12 @@ Otros comandos:
 npm test             # tests (numeración, historial, papelera, formatos…)
 npm run build        # compila como en producción
 npm run db:push      # sube las migraciones nuevas a Supabase (pide confirmación)
+```
+
+> Las tres primeras migraciones se aplicaron pegándolas en el *SQL Editor* de Supabase. Antes de usar `db:push` por primera vez hay que enlazar el proyecto (`npx.cmd supabase login` y `npx.cmd supabase link --project-ref dvfqrleonfkyibsrfzut`) y marcarlas como aplicadas con `npx.cmd supabase migration repair --status applied 20261028170000 20261028170100 20261028170200`.
+
+```bash
+# (en PowerShell usa npx.cmd y npm.cmd: Windows bloquea npx.ps1)
 ```
 
 ## Qué hace cada parte
