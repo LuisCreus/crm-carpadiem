@@ -13,7 +13,7 @@ export function BotonMicrosoft() {
     await supabase.auth.signInWithOAuth({
       provider: "azure",
       options: {
-        scopes: "email",
+        scopes: "email profile",
         redirectTo: `${window.location.origin}/auth/callback`,
       },
     });

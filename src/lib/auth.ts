@@ -26,10 +26,12 @@ export const obtenerUsuario = cache(async (): Promise<Usuario> => {
 
   if (!perfil || !perfil.activo) redirect("/login?error=inactivo");
 
+  // Nombre: el del perfil o, si no lo hay, el que manda Microsoft al iniciar sesión
+  const metadatos = (data?.claims?.user_metadata ?? {}) as { full_name?: string; name?: string };
   return {
     id: perfil.id,
     email: perfil.email,
-    nombre: perfil.nombre || perfil.email.split("@")[0],
+    nombre: perfil.nombre || metadatos.full_name || metadatos.name || perfil.email.split("@")[0],
     esAdmin: perfil.rol === "admin",
   };
 });
