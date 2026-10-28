@@ -1,0 +1,21 @@
+﻿# Dependencias y compilación
+node_modules/
+.next/
+out/
+build/
+coverage/
+
+# Secretos: NUNCA subir a GitHub
+.env
+.env.*
+!.env.example
+
+# Vercel / Supabase local
+.vercel/
+supabase/.temp/
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
