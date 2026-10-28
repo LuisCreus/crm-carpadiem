@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type DragEvent, type FormEvent } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { FilePlus2, Mail, Phone, Search, Trash2 } from "lucide-react";
 import { Cabecera } from "@/components/cabecera";
@@ -70,7 +71,13 @@ export function TableroLeads({ nombreUsuario }: { nombreUsuario: string }) {
   const [texto, setTexto] = useState("");
   const [filtroComercial, setFiltroComercial] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("");
-  const [editando, setEditando] = useState<Borrador | null>(null);
+  // /leads?nuevo=1 abre directamente el alta rápida (botón "+ Lead rápido" del Inicio)
+  const abrirNuevo = useSearchParams().get("nuevo") === "1";
+  const [editando, setEditando] = useState<Borrador | null>(() => (abrirNuevo ? {
+    comercial_id: null, fecha_primer_contacto: hoy(), cliente_nombre: "", contacto_nombre: "", telefono: "", email: "",
+    tipo_cliente: "particular", canal: "email", fecha_evento_aprox: "", lugar_aprox: "", que_pide: "",
+    proxima_accion_fecha: null, proxima_accion_texto: "", comentarios: "", estado: "por_contactar",
+  } : null));
   const [arrastrando, setArrastrando] = useState<string | null>(null);
 
   const comercialPropio = listas.comerciales.find((c) => c.nombre.toLowerCase() === nombreUsuario.split(" ")[0].toLowerCase());

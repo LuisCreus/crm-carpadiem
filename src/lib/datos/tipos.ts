@@ -97,6 +97,14 @@ export type Evento = {
   importe_retenido: number | null;
   comentarios: string | null;
   es_larga_duracion: boolean;
+  montaje_inicio: string | null;
+  montaje_fin: string | null;
+  desmontaje_inicio: string | null;
+  desmontaje_fin: string | null;
+  observaciones_montaje: string | null;
+  contacto_destino_id: string | null;
+  hoja_montaje_url: string | null;
+  hoja_montaje_item_id: string | null;
   cliente: { id: string; nombre: string } | null;
   presupuesto: { id: string; codigo: string; estado: EstadoPresupuesto; reserva_pct: number | null } | null;
 };

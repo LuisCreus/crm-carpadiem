@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut } from "lucide-react";
+import { LogOut, Search } from "lucide-react";
+import { abrirBusqueda } from "@/components/busqueda-global";
 import { Logo } from "@/components/logo";
 import { cn } from "@/lib/utils";
 import { NAV_PRINCIPAL, NAV_SECUNDARIA, estaActivo, type ItemNav } from "./navegacion";
@@ -37,6 +38,12 @@ export function MenuLateral({ nombre, esAdmin }: { nombre: string; esAdmin: bool
       <Link href="/" className="px-2.5 pb-5 text-[30px]" aria-label="Inicio">
         <Logo />
       </Link>
+      <button type="button" onClick={abrirBusqueda}
+        className="mb-2 flex items-center gap-2.5 rounded-lg border px-2.5 py-1.5 text-sm text-muted-foreground hover:bg-muted">
+        <Search className="size-4" aria-hidden />
+        <span className="flex-1 text-left">Buscar</span>
+        <kbd className="rounded border px-1 text-[11px]">Ctrl K</kbd>
+      </button>
       {NAV_PRINCIPAL.map((item) => <Enlace key={item.href} item={item} pathname={pathname} />)}
       <div className="grow" />
       {NAV_SECUNDARIA.filter((i) => !i.soloAdmin || esAdmin).map((item) => (

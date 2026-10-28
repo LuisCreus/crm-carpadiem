@@ -29,6 +29,8 @@ type Tarjeta = ItemFecha & {
   importe: number | null;
   clase: "confirmado" | "seguro" | "pendiente";
   cobro?: { texto: string; completo: boolean };
+  montaje?: string | null; // fecha y hora (ISO) del montaje
+  desmontaje?: string | null;
 };
 
 type PresuPendiente = {
@@ -59,7 +61,7 @@ export function Planificacion({ mesDetalle }: { mesDetalle?: string }) {
       id: e.id, href: `/eventos/${e.id}`, fecha_precision: e.fecha_precision, inicio: e.fecha_inicio, fin: e.fecha_fin,
       cliente: e.cliente?.nombre ?? "", tipo: nombreDe(listas.tiposEvento, e.tipo_evento), material: e.material ?? "",
       lugar: [e.ubicacion, e.provincia].filter(Boolean).join(", "), importe: e.importe,
-      clase: e.modalidad, cobro: textoCobro(e, formatoEuros),
+      clase: e.modalidad, cobro: textoCobro(e, formatoEuros), montaje: e.montaje_inicio, desmontaje: e.desmontaje_inicio,
     }));
     if (!verPendientes) return ev;
     return [...ev, ...pendientes.datos.map((p): Tarjeta => ({
@@ -178,23 +180,64 @@ function TarjetaEvento({ t, mes }: { t: Tarjeta; mes: MesPeriodo }) {
   );
 }
 
+const hora = (iso: string) => new Date(iso).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" });
+const diaLocal = (iso: string) => new Date(iso).toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" });
+
+type Entrada = { key: string; href: string; texto: string; titulo: string; clase: string; hora?: string };
+
+// Lo que pasa cada día: el evento, su montaje y su desmontaje (cada uno en su color)
+function entradasDelDia(tarjetas: Tarjeta[], dia: string): Entrada[] {
+  const r: Entrada[] = [];
+  for (const t of tarjetas) {
+    if (t.montaje && diaLocal(t.montaje) === dia) {
+      r.push({ key: `${t.id}-m`, href: t.href, texto: `Montaje · ${t.cliente}`, titulo: `Montaje ${hora(t.montaje)} · ${t.lugar}`, hora: hora(t.montaje), clase: "bg-[#EEF4F7] text-[#2F5D70]" });
+    }
+    if (t.fecha_precision === "dia" && t.inicio) {
+      const fin = t.fin && t.fin > t.inicio ? t.fin : t.inicio;
+      if (t.inicio <= dia && dia <= fin) {
+        r.push({ key: t.id, href: t.href, texto: t.cliente, titulo: `${t.cliente} · ${t.material}`,
+          clase: t.clase === "seguro" ? CLASE_SEGURO : t.clase === "confirmado" ? CLASE_CONFIRMADO : "border border-dashed border-[#BDBBB5] text-muted-foreground" });
+      }
+    }
+    if (t.desmontaje && diaLocal(t.desmontaje) === dia) {
+      r.push({ key: `${t.id}-d`, href: t.href, texto: `Desmontaje · ${t.cliente}`, titulo: `Desmontaje ${hora(t.desmontaje)} · ${t.lugar}`, hora: hora(t.desmontaje), clase: "bg-[#F2F1EE] text-[#4B4B48]" });
+    }
+  }
+  return r;
+}
+
 function DetalleMes({ clave, tarjetas, verPendientes, setVerPendientes }: {
   clave: string; tarjetas: Tarjeta[]; verPendientes: boolean; setVerPendientes: (v: boolean) => void;
 }) {
   const [anio, mes] = clave.split("-").map(Number);
   const m = { anio, mes };
-  const delMes = tarjetas.filter((t) => estaEnMes(t, m));
+  const delMes = tarjetas.filter((t) => estaEnMes(t, m) || (t.montaje && diaLocal(t.montaje).startsWith(clave)) || (t.desmontaje && diaLocal(t.desmontaje).startsWith(clave)));
   const dias = diasCalendario(anio, mes);
+  const semanas = Array.from({ length: dias.length / 7 }, (_, i) => dias.slice(i * 7, i * 7 + 7));
   const anterior = mes === 1 ? `${anio - 1}-12` : `${anio}-${String(mes - 1).padStart(2, "0")}`;
   const siguiente = mes === 12 ? `${anio + 1}-01` : `${anio}-${String(mes + 1).padStart(2, "0")}`;
-  const sinDia = delMes.filter((t) => t.fecha_precision !== "dia");
+  const sinDia = delMes.filter((t) => t.fecha_precision !== "dia" && estaEnMes(t, m));
   const hoy = new Date().toISOString().slice(0, 10);
+  const [vista, setVista] = useState<"mes" | "semana">("mes");
+  const semanaHoy = semanas.findIndex((s) => s.includes(hoy));
+  const [semana, setSemana] = useState(semanaHoy >= 0 ? semanaHoy : 0);
 
-  const enDia = (dia: string) => delMes.filter((t) => {
-    if (t.fecha_precision !== "dia" || !t.inicio) return false;
-    const fin = t.fin && t.fin > t.inicio ? t.fin : t.inicio;
-    return t.inicio <= dia && dia <= fin;
-  });
+  const celda = (dia: string | null, i: number, grande: boolean) => (
+    <div key={i} className={cn("border-b border-r p-1.5 [&:nth-child(7n)]:border-r-0", grande ? "min-h-64" : "min-h-24", !dia && "bg-muted/40")}>
+      {dia && (
+        <>
+          <div className={cn("mb-1 w-fit rounded-full px-1.5 font-medium", dia === hoy && "bg-brand text-white")}>{Number(dia.slice(8))}</div>
+          <div className="grid gap-1">
+            {entradasDelDia(delMes, dia).map((e) => (
+              <Link key={e.key} href={e.href} title={e.titulo} className={cn("rounded px-1.5 py-0.5", grande ? "whitespace-normal" : "truncate", e.clase)}>
+                {grande && e.hora && <b className="font-semibold">{e.hora} </b>}{e.texto}
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
 
   return (
     <>
@@ -204,35 +247,39 @@ function DetalleMes({ clave, tarjetas, verPendientes, setVerPendientes }: {
       <Cabecera titulo={`${mayus(MESES[mes - 1])} ${anio}`}>
         <Button variant="outline" size="icon" aria-label="Mes anterior" render={<Link href={`/planificacion?mes=${anterior}`} />}><ChevronLeft className="size-4" aria-hidden /></Button>
         <Button variant="outline" size="icon" aria-label="Mes siguiente" render={<Link href={`/planificacion?mes=${siguiente}`} />}><ChevronRight className="size-4" aria-hidden /></Button>
+        <div role="group" aria-label="Vista" className="inline-flex overflow-hidden rounded-lg border text-sm">
+          {(["mes", "semana"] as const).map((v) => (
+            <button key={v} type="button" aria-pressed={vista === v} onClick={() => setVista(v)}
+              className={cn("px-3 py-1.5 capitalize", vista === v ? "bg-foreground text-background" : "bg-card")}>{v}</button>
+          ))}
+        </div>
         <label className="flex items-center gap-2 rounded-lg border bg-card px-3 text-sm">
           <Switch checked={verPendientes} onCheckedChange={setVerPendientes} />
           Pendientes
         </label>
       </Cabecera>
 
+      <div className="mb-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
+        <span><Etiqueta className="bg-[#EEF4F7] text-[#2F5D70]">Montaje</Etiqueta></span>
+        <span><Etiqueta className={CLASE_CONFIRMADO}>Evento confirmado</Etiqueta></span>
+        <span><Etiqueta className={CLASE_SEGURO}>Evento con seguro</Etiqueta></span>
+        <span><Etiqueta className="bg-[#F2F1EE] text-[#4B4B48]">Desmontaje</Etiqueta></span>
+      </div>
+
+      {vista === "semana" && (
+        <div className="mb-3 flex items-center gap-2 text-sm">
+          <Button variant="outline" size="icon-sm" aria-label="Semana anterior" disabled={semana === 0} onClick={() => setSemana(semana - 1)}><ChevronLeft className="size-4" aria-hidden /></Button>
+          <span>Semana {semana + 1} de {semanas.length}</span>
+          <Button variant="outline" size="icon-sm" aria-label="Semana siguiente" disabled={semana >= semanas.length - 1} onClick={() => setSemana(semana + 1)}><ChevronRight className="size-4" aria-hidden /></Button>
+        </div>
+      )}
+
       <div className="overflow-x-auto rounded-xl border bg-card">
         <div className="grid min-w-[720px] grid-cols-7 text-xs">
           {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((d) => (
             <div key={d} className="border-b px-2 py-2 font-medium text-muted-foreground">{d}</div>
           ))}
-          {dias.map((dia, i) => (
-            <div key={i} className={cn("min-h-24 border-b border-r p-1.5 [&:nth-child(7n)]:border-r-0", !dia && "bg-muted/40")}>
-              {dia && (
-                <>
-                  <div className={cn("mb-1 w-fit rounded-full px-1.5 font-medium", dia === hoy && "bg-brand text-white")}>{Number(dia.slice(8))}</div>
-                  <div className="grid gap-1">
-                    {enDia(dia).map((t) => (
-                      <Link key={t.id} href={t.href} title={`${t.cliente} · ${t.material}`}
-                        className={cn("truncate rounded px-1.5 py-0.5",
-                          t.clase === "seguro" ? CLASE_SEGURO : t.clase === "confirmado" ? CLASE_CONFIRMADO : "border border-dashed border-[#BDBBB5] text-muted-foreground")}>
-                        {t.cliente}
-                      </Link>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          ))}
+          {vista === "mes" ? dias.map((dia, i) => celda(dia, i, false)) : (semanas[semana] ?? []).map((dia, i) => celda(dia, i, true))}
         </div>
       </div>
 
@@ -244,7 +291,6 @@ function DetalleMes({ clave, tarjetas, verPendientes, setVerPendientes }: {
           </div>
         </div>
       )}
-      <p className="mt-4 text-xs text-muted-foreground">Los montajes y desmontajes aparecerán aquí, en otro color, en la Fase 5.</p>
     </>
   );
 }

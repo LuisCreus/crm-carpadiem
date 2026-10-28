@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { Proximamente } from "@/components/proximamente";
+import { TablaInventario } from "./tabla-inventario";
 
 export const metadata: Metadata = { title: "Inventario" };
 
-export default function Page() {
-  return <Proximamente titulo="Inventario" fase={5} texto="Material propio y subalquilado, y avisos de solapes." />;
+export default function InventarioPage() {
+  return <TablaInventario />;
 }

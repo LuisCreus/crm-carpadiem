@@ -11,7 +11,10 @@ CRM web de CARPADIEM IBÉRICA S.L. para gestionar leads, presupuestos (con la pl
 | 0 | Cuentas, registro en Entra ID, repositorio | Hecha |
 | 1 | Diseño de Inicio, Ficha de presupuesto y Planificación | Hecha |
 | 2 | Login, modelo de datos, tiempo real, roles, historial y papelera | Hecha |
-| 3–9 | Funcionalidad, Word/SharePoint, eventos, móvil, copias, demo, producción | Pendiente |
+| 3 | Presupuestos, leads, eventos, planificación e importación de prueba | Hecha |
+| 4 | Word y SharePoint (en `00. CRM PRUEBAS`) | Hecha |
+| 5 | Montajes, hoja de montaje, material, inventario, avisos, Inicio y búsqueda | **En curso** |
+| 6–9 | Móvil (PWA), copias de seguridad, demo en línea, producción | Pendiente |
 
 ## Piezas
 
@@ -60,7 +63,13 @@ src/
     (app)/               Todo lo que necesita sesión iniciada
       layout.tsx         Menú lateral (ordenador) y pestañas de abajo (móvil)
       page.tsx           Inicio
-      intermediarios/    Primera pantalla real: lista en tiempo real, historial y papelera
+      page.tsx, inicio.tsx  Inicio: avisos de hoy y de la semana, próximos eventos y números
+      presupuestos/      Lista y buscador, nuevo/duplicar/otra opción, ficha con Word, PDF y cobros
+      leads/             Alta rápida, Kanban y tabla
+      eventos/           Lista y ficha: seguro de lluvia, montaje, hoja de montaje y material
+      planificacion/     12 meses, calendario mensual y semanal (montajes en colores)
+      inventario/        Material y avisos de solapes
+      intermediarios/    Wedding planners, fincas… con historial
       ajustes/           Solo admin: usuarios, dominios permitidos y numeración por año
       papelera/          Solo admin: restaurar o borrar definitivamente
       mas/               Pestaña "Más" del móvil
@@ -69,6 +78,13 @@ src/
   lib/
     auth.ts              Usuario actual y comprobación de administrador
     formato.ts           Importes "13.246 €" y fechas "dd/mm/aaaa"
+    negocio.ts           Estados, nombres de carpetas y archivos, seguro de lluvia
+    operativa.ts         Control de material, solapes de inventario, avisos y números
+    planificacion.ts     Reparto de eventos por meses y calendario
+    word/controles.ts    Controles de contenido del Word (rellenar, leer el total)
+    graph/sharepoint.ts  SharePoint por Microsoft Graph (carpetas, archivos, PDF)
+    documentos.ts        Acciones de Word/PDF/carpetas que usa la ficha del presupuesto
+    hoja-montaje.ts      PDF de la hoja de montaje (sin precios)
     supabase/            Conexión con Supabase (navegador, servidor y proxy de sesión)
   proxy.ts               Refresca la sesión y manda a /login a quien no la tenga
 

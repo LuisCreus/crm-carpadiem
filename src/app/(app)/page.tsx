@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { Cabecera } from "@/components/cabecera";
-import { EstadoVacio } from "@/components/estado-vacio";
 import { Button } from "@/components/ui/button";
 import { obtenerUsuario } from "@/lib/auth";
 import { formatoFecha } from "@/lib/formato";
+import { Inicio } from "./inicio";
 
 function saludo(hora: number) {
   if (hora < 14) return "Buenos días";
@@ -18,13 +18,11 @@ export default async function InicioPage() {
 
   return (
     <>
-      <Cabecera titulo={`${saludo(ahora.getHours())}, ${nombre}`} subtitulo={formatoFecha(ahora)} />
-      <EstadoVacio
-        titulo="El Inicio se llena en la Fase 5"
-        texto="Aquí verás los seguimientos, montajes, plazos de seguro y cobros de hoy y de esta semana. De momento puedes probar los intermediarios en tiempo real."
-      >
-        <Button render={<Link href="/intermediarios" />}>Ir a Intermediarios</Button>
-      </EstadoVacio>
+      <Cabecera titulo={`${saludo(ahora.getHours())}, ${nombre}`} subtitulo={formatoFecha(ahora)}>
+        <Button variant="outline" render={<Link href="/leads?nuevo=1" />}>+ Lead rápido</Button>
+        <Button render={<Link href="/presupuestos/nuevo" />}>+ Nuevo presupuesto</Button>
+      </Cabecera>
+      <Inicio />
     </>
   );
 }

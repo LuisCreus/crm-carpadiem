@@ -17,8 +17,22 @@ import { crearClienteNavegador } from "@/lib/supabase/client";
 import { SELECT_EVENTO, uno, type Contacto, type Evento } from "@/lib/datos/tipos";
 import { formatoEuros, formatoFecha } from "@/lib/formato";
 import { diaSemana, enlaceMaps, fechaLimiteSeguro, textoFechaEvento } from "@/lib/negocio";
+import { rangoOcupacion, solapesMaterial, type EventoOcupacion, type Solape } from "@/lib/operativa";
+import { TarjetaMontaje } from "./montaje";
+import {
+  TarjetaControlMaterial, TarjetaMaterialReservado, type ItemInventario, type MovimientoMaterial, type ReservaMaterial,
+} from "./material";
 
-type Datos = { e: Evento; contactos: Contacto[]; cobrado: number };
+type Datos = {
+  e: Evento;
+  contactos: Contacto[];
+  cobrado: number;
+  montadores: string[];
+  movimientos: MovimientoMaterial[];
+  reservas: ReservaMaterial[];
+  inventario: ItemInventario[];
+  solapes: Solape[];
+};
 
 function Tarjeta({ titulo, accion, children }: { titulo: string; accion?: ReactNode; children: ReactNode }) {
   return (
@@ -35,27 +49,48 @@ function Tarjeta({ titulo, accion, children }: { titulo: string; accion?: ReactN
 export function FichaEvento({ id }: { id: string }) {
   const listas = useListas();
   const [editar, setEditar] = useState(false);
-  const { datos, cargando } = useTablaEnVivo<Datos>(["eventos", "cobros", "contactos", "clientes", "presupuestos"], async (sb) => {
-    const { data, error } = await sb.from("eventos").select(SELECT_EVENTO).eq("id", id).maybeSingle();
-    if (error) throw new Error(error.message);
-    if (!data) return [];
-    const [ct, co] = await Promise.all([
-      sb.from("contactos").select("id, nombre, rol, telefono, email").eq("cliente_id", data.cliente_id).is("deleted_at", null).order("orden"),
-      data.presupuesto_id
-        ? sb.from("cobros").select("importe").eq("presupuesto_id", data.presupuesto_id).is("deleted_at", null)
-        : Promise.resolve({ data: [] as { importe: number }[] }),
-    ]);
-    return [{
-      e: { ...data, cliente: uno(data.cliente), presupuesto: uno(data.presupuesto), importe: data.importe !== null ? Number(data.importe) : null } as Evento,
-      contactos: (ct.data ?? []) as Contacto[],
-      cobrado: (co.data ?? []).reduce((s, c) => s + Number(c.importe), 0),
-    }];
-  });
+  const { datos, cargando } = useTablaEnVivo<Datos>(
+    ["eventos", "cobros", "contactos", "clientes", "presupuestos", "evento_montadores", "material_movimientos", "evento_material", "inventario"],
+    async (sb) => {
+      const { data, error } = await sb.from("eventos").select(SELECT_EVENTO).eq("id", id).maybeSingle();
+      if (error) throw new Error(error.message);
+      if (!data) return [];
+      const [ct, co, mo, mv, res, inv, todos] = await Promise.all([
+        sb.from("contactos").select("id, nombre, rol, telefono, email").eq("cliente_id", data.cliente_id).is("deleted_at", null).order("orden"),
+        data.presupuesto_id
+          ? sb.from("cobros").select("importe").eq("presupuesto_id", data.presupuesto_id).is("deleted_at", null)
+          : Promise.resolve({ data: [] as { importe: number }[] }),
+        sb.from("evento_montadores").select("montador_id").eq("evento_id", id),
+        sb.from("material_movimientos").select("id, material, cantidad, sentido, fecha, notas").eq("evento_id", id).is("deleted_at", null).order("created_at"),
+        sb.from("evento_material").select("id, evento_id, inventario_id, cantidad"),
+        sb.from("inventario").select("id, material, cantidad, unidad").is("deleted_at", null).order("material"),
+        sb.from("eventos").select("id, fecha_precision, fecha_inicio, fecha_fin, montaje_inicio, desmontaje_inicio, desmontaje_fin, cliente:clientes(nombre)")
+          .eq("estado", "activo").is("deleted_at", null),
+      ]);
+      const reservasTodas = (res.data ?? []) as (ReservaMaterial & { evento_id: string })[];
+      const inventario = ((inv.data ?? []) as ItemInventario[]).map((i) => ({ ...i, cantidad: Number(i.cantidad) }));
+      const ocupacion: EventoOcupacion[] = (todos.data ?? []).flatMap((ev) => {
+        const rango = rangoOcupacion(ev);
+        const material = reservasTodas.filter((r) => r.evento_id === ev.id).map((r) => ({ inventarioId: r.inventario_id, cantidad: Number(r.cantidad) }));
+        return rango && material.length ? [{ id: ev.id, nombre: uno(ev.cliente)?.nombre ?? "Evento", ...rango, material }] : [];
+      });
+      return [{
+        e: { ...data, cliente: uno(data.cliente), presupuesto: uno(data.presupuesto), importe: data.importe !== null ? Number(data.importe) : null } as Evento,
+        contactos: (ct.data ?? []) as Contacto[],
+        cobrado: (co.data ?? []).reduce((s, c) => s + Number(c.importe), 0),
+        montadores: (mo.data ?? []).map((m) => m.montador_id as string),
+        movimientos: (mv.data ?? []) as MovimientoMaterial[],
+        reservas: reservasTodas.filter((r) => r.evento_id === id),
+        inventario,
+        solapes: solapesMaterial(ocupacion, inventario).filter((s) => s.eventoIds.includes(id)),
+      }];
+    },
+  );
 
   const d = datos[0];
   if (cargando) return <p className="text-sm text-muted-foreground">Cargando…</p>;
   if (!d) return <p className="text-sm text-muted-foreground">Este evento no existe o está en la papelera.</p>;
-  const { e, contactos, cobrado } = d;
+  const { e, contactos, cobrado, montadores, movimientos, reservas, inventario, solapes } = d;
   const sb = crearClienteNavegador();
   const direccion = [e.ubicacion, e.provincia].filter(Boolean).join(", ");
   const limite = e.modalidad === "seguro" && e.fecha_precision === "dia" && e.fecha_inicio ? fechaLimiteSeguro(e.fecha_inicio) : null;
@@ -156,9 +191,9 @@ export function FichaEvento({ id }: { id: string }) {
               </div>
             )}
           </Tarjeta>
-          <Tarjeta titulo="Montaje y material">
-            <p className="text-sm text-muted-foreground">Horarios de montaje y desmontaje, montadores, hoja de montaje y control de material llegan en la Fase 5.</p>
-          </Tarjeta>
+          <TarjetaMontaje key={e.id + (e.montaje_inicio ?? "")} evento={e} contactos={contactos} montadoresAsignados={montadores} />
+          <TarjetaMaterialReservado eventoId={e.id} reservas={reservas} inventario={inventario} solapes={solapes} />
+          <TarjetaControlMaterial eventoId={e.id} movimientos={movimientos} inventario={inventario} />
         </div>
       </div>
 

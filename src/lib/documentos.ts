@@ -11,6 +11,7 @@ import {
   elementoPorRuta, moverRenombrar, rutaPlantilla, rutaReal, sharepointConfigurado, subir, urlDirecta,
 } from "@/lib/graph/sharepoint";
 import { leerImporte, rellenarControles } from "@/lib/word/controles";
+import { cargarDatosHoja, generarPdfHoja, nombreArchivoHoja } from "@/lib/hoja-montaje";
 import { codigoPresupuesto } from "@/lib/formato";
 import { nombreArchivoPresupuesto, rutaCarpetaCliente, textoFechaEvento, type PrecisionFecha } from "@/lib/negocio";
 
@@ -206,4 +207,23 @@ export async function estadoSharePoint(): Promise<{ configurado: boolean; raiz: 
 export async function enlaceEscritorio(rutaArchivo: string): Promise<string> {
   await obtenerUsuario();
   return `ms-word:ofe|u|${await urlDirecta(rutaArchivo)}`;
+}
+
+// Guarda la hoja de montaje en la carpeta del cliente en SharePoint
+export async function guardarHojaMontaje(eventoId: string): Promise<Resultado<{ nombre: string; webUrl: string }>> {
+  return capturar(async () => {
+    await obtenerUsuario();
+    if (!sharepointConfigurado()) throw new ErrorSharePoint("SharePoint todavía no está configurado en el CRM. Usa Descargar o Compartir.");
+    const sb = await crearClienteServidor();
+    const datos = await cargarDatosHoja(sb, eventoId);
+    if (!datos) throw new Error("Evento no encontrado");
+    const ruta = datos.carpetaRuta
+      ?? rutaReal(rutaCarpetaCliente(datos.fechaPrecision, datos.fechaInicio, datos.cliente));
+    await asegurarCarpeta(ruta);
+    const nombre = nombreArchivoHoja(datos);
+    const item = await subir(`${ruta}/${nombre}`, await generarPdfHoja(datos), TIPO_PDF);
+    const { error } = await sb.from("eventos").update({ hoja_montaje_url: item.webUrl, hoja_montaje_item_id: item.id }).eq("id", eventoId);
+    if (error) throw new Error(error.message);
+    return { ok: true, nombre, webUrl: item.webUrl };
+  });
 }
