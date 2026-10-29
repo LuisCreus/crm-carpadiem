@@ -20,6 +20,8 @@ const TIPOS: Record<TipoAviso, { texto: string; clase: string }> = {
   desmontaje: { texto: "Desmontaje", clase: "bg-[#F2F1EE] text-[#4B4B48]" },
   seguro: { texto: "Seguro de lluvia", clase: "bg-[#FDF3E1] text-[#8A5A0B]" },
   cobro: { texto: "Cobro", clase: "bg-[#F2F1EE] text-[#4B4B48]" },
+  factura: { texto: "Factura", clase: "bg-[#FDF3E1] text-[#8A5A0B]" },
+  factura_cobro: { texto: "Factura sin cobrar", clase: "bg-[#FDEDEC] text-[#B0302A]" },
 };
 
 type Datos = {
@@ -35,15 +37,16 @@ export function Inicio() {
   const [periodo, setPeriodo] = useState<"mes" | "anio">("mes");
 
   const { datos, cargando } = useTablaEnVivo<Datos>(
-    ["presupuestos", "eventos", "cobros", "leads", "clientes", "ajustes"],
+    ["presupuestos", "eventos", "cobros", "leads", "clientes", "ajustes", "facturas"],
     async (sb) => {
-      const [pr, ev, co, le, aj] = await Promise.all([
+      const [pr, ev, co, le, aj, fa] = await Promise.all([
         sb.from("presupuestos").select("id, codigo, anio, estado, enviado_at, importe, reserva_pct, cliente_id, cliente:clientes(nombre)").is("deleted_at", null),
-        sb.from("eventos").select("id, presupuesto_id, cliente_id, estado, modalidad, fecha_precision, fecha_inicio, fecha_fin, montaje_inicio, desmontaje_inicio, importe, ubicacion, provincia, material, tipo_evento, cliente:clientes(nombre)")
+        sb.from("eventos").select("id, presupuesto_id, cliente_id, estado, modalidad, fecha_precision, fecha_inicio, fecha_fin, montaje_inicio, desmontaje_inicio, importe, ubicacion, provincia, material, tipo_evento, es_larga_duracion, cuota_mensual, cliente:clientes(nombre)")
           .is("deleted_at", null),
         sb.from("cobros").select("presupuesto_id, importe").is("deleted_at", null),
         sb.from("leads").select("id, cliente_nombre, estado, proxima_accion_fecha, proxima_accion_texto").is("deleted_at", null),
-        sb.from("ajustes").select("dias_seguimiento, dias_limite_seguro, dias_aviso_seguro").maybeSingle(),
+        sb.from("ajustes").select("dias_seguimiento, dias_limite_seguro, dias_aviso_seguro, dias_aviso_resto, dias_aviso_cobro_factura").maybeSingle(),
+        sb.from("facturas").select("id, evento_id, tipo, estado, importe, codigo, fecha_emision").is("deleted_at", null).neq("estado", "pagada"),
       ]);
       const cobrado = new Map<string, number>();
       for (const c of co.data ?? []) cobrado.set(c.presupuesto_id, (cobrado.get(c.presupuesto_id) ?? 0) + Number(c.importe));
@@ -54,9 +57,12 @@ export function Inicio() {
       const eventos = (ev.data ?? []).map((e) => ({
         ...e, cliente: uno(e.cliente)?.nombre ?? "", importe: e.importe !== null ? Number(e.importe) : null,
         cobrado: e.presupuesto_id ? cobrado.get(e.presupuesto_id) ?? 0 : 0,
+        cuota_mensual: e.cuota_mensual !== null ? Number(e.cuota_mensual) : null,
       }));
-      const avisos = calcularAvisos(hoy, { presupuestos, eventos, leads: le.data ?? [] }, {
+      const facturas = (fa.data ?? []).map((f) => ({ ...f, importe: Number(f.importe) }));
+      const avisos = calcularAvisos(hoy, { presupuestos, eventos, leads: le.data ?? [], facturas }, {
         diasSeguimiento: aj.data?.dias_seguimiento ?? 7, diasLimiteSeguro: aj.data?.dias_limite_seguro ?? 10, diasAvisoSeguro: aj.data?.dias_aviso_seguro ?? 3,
+        diasAvisoResto: aj.data?.dias_aviso_resto ?? 7, diasAvisoCobroFactura: aj.data?.dias_aviso_cobro_factura ?? 15,
       });
       const proximos = eventos
         .filter((e) => e.estado === "activo" && e.fecha_inicio && (e.fecha_fin ?? e.fecha_inicio) >= hoy)

@@ -1,5 +1,5 @@
 // Copia de seguridad del CRM en Excel: una foto para consultar, no para editar.
-// Hojas: Presupuestos, Eventos, Leads, Cobros y Material.
+// Hojas: Presupuestos, Eventos, Leads, Cobros, Facturas y Material.
 
 import ExcelJS from "exceljs";
 
@@ -9,6 +9,7 @@ export type DatosCopia = {
   eventos: Fila[];
   leads: Fila[];
   cobros: Fila[];
+  facturas: Fila[];
   material: Fila[];
 };
 
@@ -83,6 +84,27 @@ const HOJAS: { nombre: string; clave: keyof DatosCopia; columnas: Columna[] }[] 
       { titulo: "Importe", clave: "importe", ancho: 13, tipo: "euros" },
       { titulo: "Concepto", clave: "concepto", ancho: 11 },
       { titulo: "Notas", clave: "notas", ancho: 32 },
+    ],
+  },
+  {
+    nombre: "Facturas", clave: "facturas", columnas: [
+      { titulo: "Estado", clave: "estado", ancho: 11 },
+      { titulo: "Nº Factura", clave: "codigo", ancho: 13 },
+      { titulo: "Fecha de emisión", clave: "fecha_emision", ancho: 13, tipo: "fecha" },
+      { titulo: "Tipo", clave: "tipo", ancho: 12 },
+      { titulo: "Evento", clave: "evento", ancho: 30 },
+      { titulo: "Nombre completo", clave: "fact_nombre", ancho: 30 },
+      { titulo: "DNI / NIF", clave: "fact_nif", ancho: 13 },
+      { titulo: "Domicilio fiscal", clave: "fact_domicilio", ancho: 30 },
+      { titulo: "CP/Ciudad", clave: "fact_cp_ciudad", ancho: 18 },
+      { titulo: "Concepto", clave: "concepto", ancho: 40 },
+      { titulo: "Descripción", clave: "descripcion", ancho: 30 },
+      { titulo: "Base", clave: "importe", ancho: 12, tipo: "euros" },
+      { titulo: "IVA %", clave: "iva_pct", ancho: 7, tipo: "numero" },
+      { titulo: "Suplidos", clave: "suplidos", ancho: 10, tipo: "euros" },
+      { titulo: "Total", clave: "total", ancho: 12, tipo: "euros" },
+      { titulo: "Fecha de pago", clave: "fecha_pago", ancho: 13, tipo: "fecha" },
+      { titulo: "Email", clave: "fact_email", ancho: 28 },
     ],
   },
   {

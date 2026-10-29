@@ -120,7 +120,7 @@ function cantidadDe(e: EventoOcupacion, inventarioId: string) {
 // Avisos (Inicio)
 // ---------------------------------------------------------------------
 
-export type TipoAviso = "seguimiento" | "accion_lead" | "montaje" | "desmontaje" | "seguro" | "cobro";
+export type TipoAviso = "seguimiento" | "accion_lead" | "montaje" | "desmontaje" | "seguro" | "cobro" | "factura" | "factura_cobro";
 export type Aviso = { tipo: TipoAviso; fecha: string; titulo: string; detalle: string; href: string; urgente: boolean };
 
 export type PresupuestoAvisos = {
@@ -131,16 +131,24 @@ export type EventoAvisos = {
   fecha_precision: PrecisionFecha; fecha_inicio: string | null; fecha_fin: string | null;
   montaje_inicio: string | null; desmontaje_inicio: string | null;
   importe: number | null; cobrado: number; ubicacion: string | null;
+  es_larga_duracion?: boolean; cuota_mensual?: number | null;
+};
+export type FacturaAvisos = {
+  id: string; evento_id: string | null; tipo: string; estado: string; importe: number;
+  codigo: string | null; fecha_emision: string | null;
 };
 export type LeadAvisos = { id: string; cliente_nombre: string; estado: string; proxima_accion_fecha: string | null; proxima_accion_texto: string | null };
 
-export type AjustesAvisos = { diasSeguimiento: number; diasLimiteSeguro: number; diasAvisoSeguro: number };
+export type AjustesAvisos = {
+  diasSeguimiento: number; diasLimiteSeguro: number; diasAvisoSeguro: number;
+  diasAvisoResto?: number; diasAvisoCobroFactura?: number;
+};
 
 const hora = (fechaHora: string) => new Date(fechaHora).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" });
 
 export function calcularAvisos(
   hoy: string,
-  datos: { presupuestos: PresupuestoAvisos[]; eventos: EventoAvisos[]; leads: LeadAvisos[] },
+  datos: { presupuestos: PresupuestoAvisos[]; eventos: EventoAvisos[]; leads: LeadAvisos[]; facturas?: FacturaAvisos[] },
   ajustes: AjustesAvisos,
 ): Aviso[] {
   const avisos: Aviso[] = [];
@@ -186,7 +194,53 @@ export function calcularAvisos(
     }
   }
 
+  avisos.push(...avisosFacturas(hoy, datos.eventos, datos.facturas ?? [], ajustes));
   return avisos.sort((a, b) => Number(b.urgente) - Number(a.urgente) || a.fecha.localeCompare(b.fecha));
+}
+
+const euros = (n: number) => `${n.toLocaleString("es-ES", { maximumFractionDigits: 2, useGrouping: true })} €`;
+
+// Facturas: reserva por emitir (en cuanto se acepta), resto desde N días antes del evento,
+// emitidas sin cobrar desde N días después y la mensualidad de los proyectos de larga duración
+function avisosFacturas(hoy: string, eventos: EventoAvisos[], facturas: FacturaAvisos[], ajustes: AjustesAvisos): Aviso[] {
+  const avisos: Aviso[] = [];
+  const evento = new Map(eventos.map((e) => [e.id, e]));
+  const diasResto = ajustes.diasAvisoResto ?? 7;
+  const diasCobro = ajustes.diasAvisoCobroFactura ?? 15;
+  for (const f of facturas) {
+    const e = f.evento_id ? evento.get(f.evento_id) : undefined;
+    const href = e ? `/eventos/${e.id}` : "/facturas";
+    const quien = e?.cliente ?? "Factura";
+    if (f.estado === "prevista" && e?.estado === "activo") {
+      if (f.tipo === "reserva") {
+        avisos.push({ tipo: "factura", fecha: hoy, titulo: quien, detalle: `Factura de reserva por emitir · ${euros(f.importe)}`, href, urgente: true });
+      } else if (f.tipo !== "mensualidad" && e.fecha_precision === "dia" && e.fecha_inicio) {
+        const desde = sumarDias(e.fecha_inicio, -diasResto);
+        if (desde <= hoy) {
+          const que = f.tipo === "resto" ? "Factura del resto" : "Factura";
+          avisos.push({ tipo: "factura", fecha: e.fecha_inicio, titulo: quien,
+            detalle: `${que} por emitir · ${euros(f.importe)} · evento el ${formatoCorto(e.fecha_inicio)}`,
+            href, urgente: e.fecha_inicio <= hoy });
+        }
+      }
+    }
+    if (f.estado === "emitida" && f.fecha_emision) {
+      const toca = sumarDias(f.fecha_emision, diasCobro);
+      if (toca <= hoy) {
+        avisos.push({ tipo: "factura_cobro", fecha: toca, titulo: `${f.codigo} · ${quien}`, detalle: `Emitida el ${formatoCorto(f.fecha_emision)} · sin cobrar (${euros(f.importe)} sin IVA)`, href, urgente: true });
+      }
+    }
+  }
+  // Mensualidad del mes en curso sin factura
+  const mes = hoy.slice(0, 7);
+  for (const e of eventos) {
+    if (e.estado !== "activo" || !e.es_larga_duracion || !e.cuota_mensual) continue;
+    const hecha = facturas.some((f) => f.evento_id === e.id && f.tipo === "mensualidad" && (f.estado === "prevista" || f.fecha_emision?.startsWith(mes)));
+    if (!hecha) {
+      avisos.push({ tipo: "factura", fecha: `${mes}-01`, titulo: e.cliente, detalle: `Mensualidad de este mes por emitir · ${euros(e.cuota_mensual)}`, href: `/eventos/${e.id}`, urgente: true });
+    }
+  }
+  return avisos;
 }
 
 function formatoCorto(fecha: string) {

@@ -106,12 +106,54 @@ export type Evento = {
   contacto_destino_id: string | null;
   hoja_montaje_url: string | null;
   hoja_montaje_item_id: string | null;
-  cliente: { id: string; nombre: string } | null;
+  cuota_mensual: number | null;
+} & DatosFacturacion & {
+  cliente: ({ id: string; nombre: string } & DatosFacturacion) | null;
   presupuesto: { id: string; codigo: string; estado: EstadoPresupuesto; reserva_pct: number | null } | null;
 };
 
 export const SELECT_EVENTO =
-  "*, cliente:clientes(id, nombre), presupuesto:presupuestos(id, codigo, estado, reserva_pct)";
+  "*, cliente:clientes(id, nombre, fact_nombre, fact_nif, fact_domicilio, fact_cp_ciudad, fact_email), presupuesto:presupuestos(id, codigo, estado, reserva_pct)";
+
+// Datos de facturación (en el cliente, en el evento si se factura a otro, y congelados en cada factura)
+export type DatosFacturacion = {
+  fact_nombre: string | null;
+  fact_nif: string | null;
+  fact_domicilio: string | null;
+  fact_cp_ciudad: string | null;
+  fact_email: string | null;
+};
+
+export type TipoFactura = "reserva" | "resto" | "mensualidad" | "otra";
+export type EstadoFactura = "prevista" | "emitida" | "pagada";
+
+export type Factura = DatosFacturacion & {
+  id: string;
+  evento_id: string | null;
+  cliente_id: string | null;
+  tipo: TipoFactura;
+  concepto: string | null;
+  descripcion: string | null;
+  importe: number;
+  iva_pct: number;
+  suplidos: number;
+  estado: EstadoFactura;
+  anio: number | null;
+  numero: number | null;
+  codigo: string | null;
+  fecha_emision: string | null;
+  fecha_pago: string | null;
+  automatica: boolean;
+  comentarios: string | null;
+};
+
+export const SELECT_FACTURA =
+  "id, evento_id, cliente_id, tipo, concepto, descripcion, importe, iva_pct, suplidos, estado, anio, numero, codigo, fecha_emision, fecha_pago, automatica, comentarios, fact_nombre, fact_nif, fact_domicilio, fact_cp_ciudad, fact_email";
+
+// Los numeric llegan como texto: se pasan a número
+export function aFactura(f: Record<string, unknown>): Factura {
+  return { ...(f as Factura), importe: Number(f.importe), iva_pct: Number(f.iva_pct), suplidos: Number(f.suplidos) };
+}
 
 export const CONCEPTOS_COBRO = { reserva: "Reserva", resto: "Resto", otro: "Otro" } as const;
 

@@ -94,6 +94,36 @@ describe("avisos del Inicio", () => {
   });
 });
 
+describe("avisos de facturas", () => {
+  const ev = (id: string, fecha: string, extra = {}) => ({
+    id, cliente: "Cliente " + id, estado: "activo", modalidad: "confirmado" as const, fecha_precision: "dia" as const,
+    fecha_inicio: fecha, fecha_fin: null, montaje_inicio: null, desmontaje_inicio: null, importe: 10000, cobrado: 0, ubicacion: null, ...extra,
+  });
+  const fa = (evento: string, tipo: string, estado: string, fecha_emision: string | null = null) =>
+    ({ id: evento + tipo, evento_id: evento, tipo, estado, importe: 3000, codigo: estado === "prevista" ? null : "CD 2026/30", fecha_emision });
+  const AJ = { diasSeguimiento: 7, diasLimiteSeguro: 10, diasAvisoSeguro: 3, diasAvisoResto: 7, diasAvisoCobroFactura: 15 };
+  const avisos = (eventos: ReturnType<typeof ev>[], facturas: ReturnType<typeof fa>[]) =>
+    calcularAvisos("2026-11-02", { presupuestos: [], eventos, leads: [], facturas }, AJ).filter((a) => a.tipo.startsWith("factura"));
+
+  it("reserva por emitir en cuanto se acepta; resto desde 7 días antes del evento", () => {
+    expect(avisos([ev("a", "2027-06-01")], [fa("a", "reserva", "prevista"), fa("a", "resto", "prevista")]).map((a) => a.detalle))
+      .toEqual(["Factura de reserva por emitir · 3.000 €"]);
+    expect(avisos([ev("b", "2026-11-08")], [fa("b", "resto", "prevista")]).map((a) => a.detalle))
+      .toEqual(["Factura del resto por emitir · 3.000 € · evento el 08/11/2026"]);
+  });
+
+  it("emitida sin cobrar a los 15 días", () => {
+    expect(avisos([ev("c", "2026-12-01")], [fa("c", "reserva", "emitida", "2026-10-20")])).toHaveLength(0);
+    expect(avisos([ev("c", "2026-12-01")], [fa("c", "reserva", "emitida", "2026-10-18")])[0].tipo).toBe("factura_cobro");
+  });
+
+  it("mensualidad del mes sin factura en los proyectos de larga duración", () => {
+    const p = ev("p", "2026-06-01", { es_larga_duracion: true, cuota_mensual: 670 });
+    expect(avisos([p], [fa("p", "mensualidad", "emitida", "2026-10-27")])[0].detalle).toBe("Mensualidad de este mes por emitir · 670 €");
+    expect(avisos([p], [fa("p", "mensualidad", "emitida", "2026-11-01")])).toHaveLength(0);
+  });
+});
+
 describe("números del Inicio", () => {
   const p = (estado: string, enviado: string | null, importe: number, reserva = 30, cobrado = 0) =>
     ({ estado: estado as never, enviado_at: enviado, importe, reserva_pct: reserva, cobrado });

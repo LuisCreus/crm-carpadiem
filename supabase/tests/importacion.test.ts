@@ -26,6 +26,17 @@ describe.skipIf(!archivo)("importación de prueba", () => {
     console.log("Rechazados:", await q("select codigo, motivo_rechazo from public.presupuestos where estado = 'rechazado' order by numero"));
     expect((enlaces[0] as { enviados: number }).enviados).toBe(0);
 
+    // Facturas del Excel contable (si se indica el archivo)
+    if (process.env.FACTURAS_SQL) {
+      await db.exec(readFileSync(process.env.FACTURAS_SQL, "utf8"));
+      console.log("Facturas:", await q("select estado, count(*)::int n, sum(importe)::float total from public.facturas group by 1 order by 1"));
+      console.log("Sin cobro enlazado:", await q("select codigo from public.facturas where estado = 'pagada' and cobro_id is null order by numero"));
+      console.log("Por facturar:", await q(`select p.codigo, e.importe::float total, f.tipo, f.importe::float from public.facturas f
+        join public.eventos e on e.id = f.evento_id left join public.presupuestos p on p.id = e.presupuesto_id
+        where f.estado = 'prevista' order by p.numero`));
+      console.log("Numeración:", await q("select * from public.numeracion_facturas"));
+    }
+
     // Después de importar se pueden aceptar y cambiar de estado
     const pendientes = (await q("select id from public.presupuestos where estado = 'pendiente' order by numero")) as { id: string }[];
     for (const p of pendientes) await comoUsuario(db, luis, () => db.query("select public.aceptar_presupuesto($1)", [p.id]));

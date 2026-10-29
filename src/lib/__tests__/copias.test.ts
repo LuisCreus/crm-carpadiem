@@ -3,18 +3,19 @@ import ExcelJS from "exceljs";
 import { copiasQueSobran, generarExcelCopia, nombreCopia } from "../copias";
 
 describe("copia de seguridad", () => {
-  it("genera las 5 hojas con sus datos y formatos", async () => {
+  it("genera las 6 hojas con sus datos y formatos", async () => {
     const xlsx = await generarExcelCopia({
       presupuestos: [{ codigo: "CD 078", anio: 2026, cliente: "Carlota Durán", estado: "Pendiente", fecha_evento: "2027-05-08", importe: 13246 }],
       eventos: [{ codigo: "CD 063", cliente: "Elena Guinea", fecha_inicio: "2026-09-05", importe: 13070, cobrado: 13070, es_larga_duracion: false }],
       leads: [{ cliente_nombre: "Familia Ortega", estado: "Interesado" }],
       cobros: [{ codigo: "CD 063", fecha: "2026-09-03", importe: 11870 }],
+      facturas: [{ estado: "Pagada", codigo: "CD 2026/20", fecha_emision: "2026-09-03", importe: 11870, total: 14362.7 }],
       material: [{ cliente: "Elena Guinea", material: "Picas 1 m", sentido: "sale", cantidad: 32 }],
     }, new Date("2026-11-02T06:00:00Z"));
 
     const libro = new ExcelJS.Workbook();
     await libro.xlsx.load(xlsx.buffer as ArrayBuffer);
-    expect(libro.worksheets.map((w) => w.name)).toEqual(["Presupuestos", "Eventos", "Leads", "Cobros", "Material"]);
+    expect(libro.worksheets.map((w) => w.name)).toEqual(["Presupuestos", "Eventos", "Leads", "Cobros", "Facturas", "Material"]);
     const p = libro.getWorksheet("Presupuestos")!;
     expect(p.getRow(1).getCell(1).value).toBe("Nº");
     expect(p.getRow(2).getCell(1).value).toBe("CD 078");

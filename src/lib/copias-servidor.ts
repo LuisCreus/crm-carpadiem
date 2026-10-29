@@ -6,13 +6,14 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ESTADOS, type EstadoPresupuesto } from "@/lib/negocio";
 import { uno } from "@/lib/datos/tipos";
+import { ESTADOS_FACTURA, TIPOS_FACTURA, totalFactura } from "@/lib/facturacion";
 import { generarExcelCopia, copiasQueSobran, nombreCopia, type DatosCopia } from "@/lib/copias";
 import {
   TIPO_XLSX, asegurarCarpeta, eliminarElemento, listarCarpeta, rutaCopias, sharepointConfigurado, subir,
 } from "@/lib/graph/sharepoint";
 
 export async function cargarDatosCopia(sb: SupabaseClient): Promise<DatosCopia> {
-  const [pr, ev, le, co, mv, te, ca] = await Promise.all([
+  const [pr, ev, le, co, mv, te, ca, fa] = await Promise.all([
     sb.from("presupuestos").select("*, cliente:clientes(nombre), comercial:comerciales(nombre), intermediario:intermediarios(nombre)")
       .is("deleted_at", null).order("anio").order("numero"),
     sb.from("eventos").select("*, cliente:clientes(nombre), presupuesto:presupuestos(codigo)").is("deleted_at", null).order("fecha_inicio"),
@@ -21,8 +22,10 @@ export async function cargarDatosCopia(sb: SupabaseClient): Promise<DatosCopia> 
     sb.from("material_movimientos").select("*, evento:eventos(cliente:clientes(nombre))").is("deleted_at", null).order("created_at"),
     sb.from("tipos_evento").select("codigo, nombre"),
     sb.from("canales_lead").select("codigo, nombre"),
+    sb.from("facturas").select("*, evento:eventos(cliente:clientes(nombre))").is("deleted_at", null)
+      .order("anio", { nullsFirst: false }).order("numero", { nullsFirst: false }),
   ]);
-  for (const r of [pr, ev, le, co, mv]) if (r.error) throw new Error(r.error.message);
+  for (const r of [pr, ev, le, co, mv, fa]) if (r.error) throw new Error(r.error.message);
 
   const tipos = new Map((te.data ?? []).map((t) => [t.codigo, t.nombre]));
   const canales = new Map((ca.data ?? []).map((t) => [t.codigo, t.nombre]));
@@ -48,6 +51,16 @@ export async function cargarDatosCopia(sb: SupabaseClient): Promise<DatosCopia> 
     cobros: (co.data ?? []).map((c) => {
       const p = uno(c.presupuesto) as { codigo: string; cliente: unknown } | null;
       return { ...c, codigo: p?.codigo, cliente: (uno(p?.cliente) as { nombre: string } | null)?.nombre };
+    }),
+    facturas: (fa.data ?? []).map((f) => {
+      const e = uno(f.evento) as { cliente: unknown } | null;
+      const importes = { importe: Number(f.importe), iva_pct: Number(f.iva_pct), suplidos: Number(f.suplidos) };
+      return {
+        ...f, ...importes, total: totalFactura(importes).total,
+        estado: ESTADOS_FACTURA[f.estado as keyof typeof ESTADOS_FACTURA]?.texto ?? f.estado,
+        tipo: TIPOS_FACTURA[f.tipo as keyof typeof TIPOS_FACTURA] ?? f.tipo,
+        evento: (uno(e?.cliente) as { nombre: string } | null)?.nombre,
+      };
     }),
     material: (mv.data ?? []).map((m) => {
       const e = uno(m.evento) as { cliente: unknown } | null;

@@ -15,10 +15,11 @@ import { useTablaEnVivo } from "@/hooks/use-tabla-en-vivo";
 import { nombreDe, useListas } from "@/hooks/use-listas";
 import { crearClienteNavegador } from "@/lib/supabase/client";
 import { SELECT_EVENTO, uno, type Contacto, type Evento } from "@/lib/datos/tipos";
-import { formatoEuros, formatoFecha } from "@/lib/formato";
+import { formatoEuros, formatoFecha, leerEuros } from "@/lib/formato";
 import { diaSemana, enlaceMaps, fechaLimiteSeguro, textoFechaEvento, type PrecisionFecha } from "@/lib/negocio";
 import { rangoOcupacion, solapesMaterial, type EventoOcupacion, type Solape } from "@/lib/operativa";
 import { TarjetaMontaje } from "./montaje";
+import { TarjetaFacturacion } from "./facturacion";
 import {
   TarjetaControlMaterial, TarjetaMaterialReservado, type ItemInventario, type MovimientoMaterial, type ReservaMaterial,
 } from "./material";
@@ -190,10 +191,11 @@ export function FichaEvento({ id }: { id: string }) {
               <div className="mt-4 flex items-center gap-2 border-t pt-3 text-sm">
                 Presupuesto <Link href={`/presupuestos/${e.presupuesto.id}`} className="font-semibold">{e.presupuesto.codigo}</Link>
                 <EtiquetaEstado estado={e.presupuesto.estado} />
-                <span className="ml-auto text-xs text-muted-foreground">Los cobros se apuntan en el presupuesto</span>
+                <span className="ml-auto text-xs text-muted-foreground">Cobrado = facturas pagadas</span>
               </div>
             )}
           </Tarjeta>
+          <TarjetaFacturacion e={e} cobrado={cobrado} />
           <TarjetaMontaje key={e.id + (e.montaje_inicio ?? "")} evento={e} contactos={contactos} montadoresAsignados={montadores} />
           <TarjetaMaterialReservado eventoId={e.id} reservas={reservas} inventario={inventario} solapes={solapes} />
           <TarjetaControlMaterial eventoId={e.id} movimientos={movimientos} inventario={inventario} />
@@ -216,6 +218,7 @@ function DialogoEditarEvento({ evento: e, cerrar }: { evento: Evento; cerrar: ()
     maps_url: e.maps_url ?? "",
     material: e.material ?? "",
     comentarios: e.comentarios ?? "",
+    cuota_mensual: e.cuota_mensual !== null ? String(e.cuota_mensual).replace(".", ",") : "",
   });
 
   async function guardar(ev: FormEvent) {
@@ -231,6 +234,7 @@ function DialogoEditarEvento({ evento: e, cerrar }: { evento: Evento; cerrar: ()
       maps_url: c.maps_url.trim() || null,
       material: c.material.trim() || null,
       comentarios: c.comentarios.trim() || null,
+      ...(e.es_larga_duracion ? { cuota_mensual: leerEuros(c.cuota_mensual) } : {}),
     }).eq("id", e.id);
     if (error) return toast.error(error.message);
     toast.success("Guardado ✓");
@@ -273,6 +277,11 @@ function DialogoEditarEvento({ evento: e, cerrar }: { evento: Evento; cerrar: ()
             <Input id="e-maps" type="url" placeholder="Si no se pone, se busca por la ubicación" value={c.maps_url} onChange={(x) => setC({ ...c, maps_url: x.target.value })} />
           </Campo>
           <Campo id="e-mat" etiqueta="Material" className="sm:col-span-2"><Textarea id="e-mat" rows={2} value={c.material} onChange={(x) => setC({ ...c, material: x.target.value })} /></Campo>
+          {e.es_larga_duracion && (
+            <Campo id="e-cuota" etiqueta="Cuota mensual sin IVA (€)">
+              <Input id="e-cuota" inputMode="decimal" value={c.cuota_mensual} onChange={(x) => setC({ ...c, cuota_mensual: x.target.value })} />
+            </Campo>
+          )}
           <Campo id="e-com" etiqueta="Comentarios" className="sm:col-span-2"><Textarea id="e-com" rows={3} value={c.comentarios} onChange={(x) => setC({ ...c, comentarios: x.target.value })} /></Campo>
         </form>
         <DialogFooter>

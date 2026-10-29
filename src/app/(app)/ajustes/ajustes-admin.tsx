@@ -14,7 +14,8 @@ import { codigoPresupuesto } from "@/lib/formato";
 import { exportarAhora } from "@/lib/acciones-copias";
 
 type Perfil = { id: string; email: string; nombre: string | null; rol: "admin" | "usuario"; activo: boolean };
-type Ajustes = { dominios_permitidos: string[] };
+type Ajustes = { dominios_permitidos: string[]; dias_aviso_resto: number; dias_aviso_cobro_factura: number };
+type NumeracionFacturas = { anio: number; ultimo_numero: number };
 type Numeracion = { anio: number; numero_inicial: number; ultimo_numero: number };
 
 function Seccion({ titulo, texto, children }: { titulo: string; texto?: string; children: ReactNode }) {
@@ -44,7 +45,7 @@ export function AjustesAdmin({ miId }: { miId: string }) {
   });
 
   const ajustes = useTablaEnVivo<Ajustes>(["ajustes"], async (sb) => {
-    const { data, error } = await sb.from("ajustes").select("dominios_permitidos");
+    const { data, error } = await sb.from("ajustes").select("dominios_permitidos, dias_aviso_resto, dias_aviso_cobro_factura");
     if (error) throw new Error(error.message);
     return data as Ajustes[];
   });
@@ -55,6 +56,16 @@ export function AjustesAdmin({ miId }: { miId: string }) {
     if (error) throw new Error(error.message);
     return data as Numeracion[];
   });
+
+  const numFacturas = useTablaEnVivo<NumeracionFacturas>(["numeracion_facturas"], async (sb) => {
+    const { data, error } = await sb.from("numeracion_facturas").select("anio, ultimo_numero").order("anio");
+    if (error) throw new Error(error.message);
+    return data as NumeracionFacturas[];
+  });
+  const ajusteDias = (campo: "dias_aviso_resto" | "dias_aviso_cobro_factura", valor: string) => {
+    const n = Number(valor);
+    if (Number.isInteger(n) && n >= 0 && n !== ajustes.datos[0]?.[campo]) void guardar(supabase.from("ajustes").update({ [campo]: n }).eq("id", true));
+  };
 
   const [nuevoDominio, setNuevoDominio] = useState("");
   const [nuevoAnio, setNuevoAnio] = useState("");
@@ -196,6 +207,36 @@ export function AjustesAdmin({ miId }: { miId: string }) {
           />
           <Button type="submit" variant="outline">Añadir año</Button>
         </form>
+      </Seccion>
+      <Seccion
+        titulo="Facturas"
+        texto="Numeración CD AAAA/n: la da el CRM al pulsar “Emitir”, seguida y sin repetir. Avisos que salen en Inicio."
+      >
+        <ul className="mb-4 divide-y rounded-lg border">
+          {numFacturas.datos.length === 0 && <li className="px-3 py-2.5 text-sm text-muted-foreground">Todavía no hay facturas emitidas.</li>}
+          {numFacturas.datos.map((n) => (
+            <li key={n.anio} className="flex flex-wrap items-center gap-3 px-3 py-2.5 text-sm">
+              <span className="w-14 font-semibold">{n.anio}</span>
+              <span className="text-muted-foreground">Última: CD {n.anio}/{n.ultimo_numero} · siguiente: CD {n.anio}/{n.ultimo_numero + 1}</span>
+            </li>
+          ))}
+        </ul>
+        {ajustes.datos[0] && (
+          <div className="grid gap-3 text-sm sm:grid-cols-2">
+            <label className="flex items-center gap-2">
+              Avisar de la factura del resto
+              <Input type="number" min={0} className="w-20" defaultValue={ajustes.datos[0].dias_aviso_resto}
+                onBlur={(e) => ajusteDias("dias_aviso_resto", e.target.value)} />
+              días antes del evento
+            </label>
+            <label className="flex items-center gap-2">
+              Avisar de una factura sin cobrar a los
+              <Input type="number" min={0} className="w-20" defaultValue={ajustes.datos[0].dias_aviso_cobro_factura}
+                onBlur={(e) => ajusteDias("dias_aviso_cobro_factura", e.target.value)} />
+              días
+            </label>
+          </div>
+        )}
       </Seccion>
       <Seccion
         titulo="Copias de seguridad"
