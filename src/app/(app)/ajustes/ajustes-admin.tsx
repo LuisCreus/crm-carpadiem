@@ -232,7 +232,7 @@ function CopiasDeSeguridad() {
         </p>
       )}
       <p className="text-xs text-muted-foreground">
-        Mientras dure la demo, las copias van a “00. CRM PRUEBAS/COPIAS DE SEGURIDAD”. En producción irán a “00. CRM/COPIAS DE SEGURIDAD”.
+        Las copias se guardan en “CARPA DIEM/00. CRM/COPIAS DE SEGURIDAD”.
       </p>
     </div>
   );
