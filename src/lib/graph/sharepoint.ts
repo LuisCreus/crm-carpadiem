@@ -144,11 +144,23 @@ export async function descargar(id: string): Promise<Uint8Array> {
 }
 
 // Descarga convertido a PDF (Word → PDF lo hace Microsoft)
-export async function descargarComoPdf(id: string): Promise<Uint8Array> {
+// Justo después de subir un archivo, Microsoft a veces aún no puede convertirlo: se reintenta
+export async function descargarComoPdf(id: string, intentos = 4): Promise<Uint8Array> {
   const drive = await obtenerDrive();
-  const r = await graph(`/drives/${drive}/items/${id}/content?format=pdf`);
-  if (r.status === 404) throw new ErrorSharePoint("El archivo ya no está en SharePoint");
-  return new Uint8Array(await r.arrayBuffer());
+  for (let i = 1; ; i++) {
+    try {
+      const r = await graph(`/drives/${drive}/items/${id}/content?format=pdf`);
+      if (r.status === 404) {
+        if (i < intentos) throw new ErrorSharePoint("Todavía no disponible", 404);
+        throw new ErrorSharePoint("El archivo ya no está en SharePoint");
+      }
+      return new Uint8Array(await r.arrayBuffer());
+    } catch (e) {
+      const reintentable = e instanceof ErrorSharePoint && (e.estado === undefined || e.estado === 404 || e.estado === 423 || e.estado === 429 || e.estado >= 500);
+      if (i >= intentos || !reintentable) throw e;
+      await new Promise((r) => setTimeout(r, 1500 * i));
+    }
+  }
 }
 
 // Sube (o sustituye) un archivo en la ruta indicada
