@@ -1,21 +1,16 @@
 "use server";
 
-// PDF de las facturas: se rellena la plantilla (hoja "Emitir" del Excel contable),
-// Microsoft la convierte a PDF y se guarda en 01. PENDIENTE SARA/01. EMITIDAS.
+// PDF de las facturas emitidas: se genera con la plantilla (hoja "Emitir" del Excel contable)
+// y se guarda en 01. PENDIENTE SARA/01. EMITIDAS.
 
-import { randomUUID } from "node:crypto";
 import { obtenerUsuario } from "@/lib/auth";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import {
-  ErrorSharePoint, TIPO_PDF, TIPO_XLSX, asegurarCarpeta, descargar, descargarComoPdf, eliminarElemento,
-  elementoPorId, elementoPorRuta, reemplazarContenido, rutaReal, sharepointConfigurado, subir,
+  ErrorSharePoint, TIPO_PDF, asegurarCarpeta, elementoPorId, elementoPorRuta, reemplazarContenido, rutaReal,
+  sharepointConfigurado, subir,
 } from "@/lib/graph/sharepoint";
-import { rellenarFactura } from "@/lib/excel/factura";
 import { nombreArchivoFactura } from "@/lib/facturacion";
-
-const RUTA_PLANTILLA_FACTURA = "CARPA DIEM/02. PLANTILLAS/03. FACTURAS/PLANTILLA FACTURA CRM _ CARPADIEM.xlsx";
-const CARPETA_EMITIDAS = "CARPA DIEM/03. FINANCIERO/01. FACTURAS/01. PENDIENTE SARA/01. EMITIDAS";
-const CARPETA_TEMPORAL = "CARPA DIEM/00. CRM/TEMPORAL";
+import { CARPETA_EMITIDAS, pdfFactura } from "@/lib/facturas-pdf-servidor";
 
 type Resultado = { ok: true; nombre: string; webUrl: string } | { ok: false; error: string };
 
@@ -31,9 +26,7 @@ export async function generarPdfFactura(facturaId: string): Promise<Resultado> {
     if (f.estado === "prevista" || !f.codigo || !f.numero || !f.fecha_emision) throw new Error("Primero hay que emitir la factura");
     if (!f.fact_nombre) throw new Error("La factura no tiene datos de facturación");
 
-    const plantilla = await elementoPorRuta(rutaReal(RUTA_PLANTILLA_FACTURA));
-    if (!plantilla) throw new Error(`No encuentro la plantilla de factura (${rutaReal(RUTA_PLANTILLA_FACTURA)})`);
-    const xlsx = await rellenarFactura(await descargar(plantilla.id), {
+    const pdf = await pdfFactura({
       codigo: f.codigo,
       fecha: f.fecha_emision,
       nombre: f.fact_nombre,
@@ -45,17 +38,6 @@ export async function generarPdfFactura(facturaId: string): Promise<Resultado> {
       ivaPct: Number(f.iva_pct),
       suplidos: Number(f.suplidos),
     });
-
-    // Microsoft convierte a PDF un archivo de SharePoint: se sube un momento y se borra
-    const temporal = rutaReal(CARPETA_TEMPORAL);
-    await asegurarCarpeta(temporal);
-    const borrador = await subir(`${temporal}/${randomUUID()}.xlsx`, xlsx, TIPO_XLSX);
-    let pdf: Uint8Array;
-    try {
-      pdf = await descargarComoPdf(borrador.id);
-    } finally {
-      await eliminarElemento(borrador.id).catch(() => undefined);
-    }
 
     // Si ya tenía PDF (aunque Sara lo haya movido de carpeta), se sustituye; si no, va a PENDIENTE SARA
     const existente = f.pdf_item_id ? await elementoPorId(f.pdf_item_id) : null;

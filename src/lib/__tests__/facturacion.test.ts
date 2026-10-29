@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { conceptoMensualidad, resumenFacturacion, totalFactura } from "../facturacion";
+import { conceptoAlEmitir, conceptoMensualidad, resumenFacturacion, totalFactura } from "../facturacion";
 import type { Factura } from "../datos/tipos";
 
 const f = (tipo: Factura["tipo"], estado: Factura["estado"], importe: number) => ({ tipo, estado, importe, iva_pct: 21, suplidos: 0 }) as Factura;
@@ -17,5 +17,14 @@ describe("facturación", () => {
 
   it("concepto de la mensualidad", () => {
     expect(conceptoMensualidad("2026-11-03")).toBe("Honorarios correspondientes a servicio de CARPAS en NOVIEMBRE de 2026");
+  });
+
+  it("concepto propuesto al emitir: reserva, resto con el mes de emisión y el escrito a mano", () => {
+    const hoy = "2026-11-03";
+    expect(conceptoAlEmitir({ tipo: "reserva", concepto: "x", automatica: true }, hoy))
+      .toBe('Honorarios correspondientes a "primer pago y reserva de material"');
+    expect(conceptoAlEmitir({ tipo: "resto", concepto: "… en JULIO de 2027", automatica: true }, hoy))
+      .toBe("Honorarios correspondientes a servicio de CARPAS en NOVIEMBRE de 2026");
+    expect(conceptoAlEmitir({ tipo: "otra", concepto: "Alquiler de tarima", automatica: false }, hoy)).toBe("Alquiler de tarima");
   });
 });

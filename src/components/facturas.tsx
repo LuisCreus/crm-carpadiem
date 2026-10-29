@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { crearClienteNavegador } from "@/lib/supabase/client";
 import { moverAPapelera } from "@/lib/datos/papelera";
 import type { DatosFacturacion, Factura, TipoFactura } from "@/lib/datos/tipos";
-import { ESTADOS_FACTURA, TIPOS_FACTURA, totalFactura } from "@/lib/facturacion";
+import { ESTADOS_FACTURA, TIPOS_FACTURA, conceptoAlEmitir, totalFactura } from "@/lib/facturacion";
 import { formatoEuros, formatoFecha, hoyMadrid, leerEuros } from "@/lib/formato";
 import { generarPdfFactura } from "@/lib/facturas-pdf";
 
@@ -174,11 +174,50 @@ export function AccionesFactura({ f, datos, editar }: { f: Factura; datos: Datos
   const [fechaPago, setFechaPago] = useState(hoyMadrid());
   const faltanDatos = !datos.fact_nombre || !datos.fact_nif;
   const [ocupado, setOcupado] = useState(false);
+  const [concepto, setConcepto] = useState("");
+  // Vista previa: el PDF y con qué concepto y datos se hizo (si cambian, hay que volver a verla)
+  const [vista, setVista] = useState<{ url: string; clave: string } | null>(null);
+  const [generandoVista, setGenerandoVista] = useState(false);
+  const claveVista = [concepto.trim(), datos.fact_nombre, datos.fact_nif, datos.fact_domicilio, datos.fact_cp_ciudad].join("|");
+  const vistaAlDia = vista?.clave === claveVista;
+
+  function abrirEmitir() {
+    setConcepto(conceptoAlEmitir(f, hoyMadrid()));
+    if (vista) URL.revokeObjectURL(vista.url);
+    setVista(null);
+    setDialogo("emitir");
+  }
+
+  async function verPdf() {
+    if (!concepto.trim()) return toast.error("Escribe el concepto");
+    setGenerandoVista(true);
+    try {
+      const resp = await fetch("/api/factura/vista-previa", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ facturaId: f.id, concepto }),
+      });
+      if (!resp.ok) throw new Error((await resp.json().catch(() => null))?.error ?? "No se pudo generar la vista previa");
+      if (vista) URL.revokeObjectURL(vista.url);
+      setVista({ url: URL.createObjectURL(await resp.blob()), clave: claveVista });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo generar la vista previa");
+    } finally {
+      setGenerandoVista(false);
+    }
+  }
   const sb = crearClienteNavegador();
   const { iva, total } = totalFactura(f);
 
   async function emitir() {
     setOcupado(true);
+    // El concepto que se ha revisado en la vista previa es el que va en la factura
+    if (concepto.trim() !== (f.concepto ?? "")) {
+      const r = await sb.from("facturas").update({ concepto: concepto.trim() }).eq("id", f.id);
+      if (r.error) {
+        setOcupado(false);
+        return toast.error(r.error.message);
+      }
+    }
     const { data, error } = await sb.rpc("emitir_factura", { p_id: f.id });
     if (error) {
       setOcupado(false);
@@ -244,7 +283,7 @@ export function AccionesFactura({ f, datos, editar }: { f: Factura; datos: Datos
     <span className="flex flex-wrap items-center gap-1.5">
       {f.estado === "prevista" && (
         <>
-          <Button size="sm" onClick={() => setDialogo("emitir")}>Emitir</Button>
+          <Button size="sm" onClick={abrirEmitir}>Emitir</Button>
           {editar && <Button size="sm" variant="ghost" onClick={editar}>Editar</Button>}
           <Button size="sm" variant="ghost" onClick={quitar}>Quitar</Button>
         </>
@@ -265,10 +304,10 @@ export function AccionesFactura({ f, datos, editar }: { f: Factura; datos: Datos
       {f.estado === "pagada" && <Button size="sm" variant="ghost" onClick={deshacerPago}>Deshacer pago</Button>}
 
       <Dialog open={dialogo === "emitir"} onOpenChange={(a) => !a && setDialogo(null)}>
-        <DialogContent>
+        <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>Emitir factura</DialogTitle>
-            <DialogDescription>Recibe el siguiente número (CD {new Date().getFullYear()}/…) y ya no se puede borrar ni cambiar de importe.</DialogDescription>
+            <DialogDescription>Revisa el PDF antes de emitir. Al emitir recibe el siguiente número y ya no se puede borrar ni cambiar de importe.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 text-sm">
             <div className="flex items-start gap-3 rounded-lg border bg-background p-3">
@@ -279,8 +318,11 @@ export function AccionesFactura({ f, datos, editar }: { f: Factura; datos: Datos
                 </Button>
               )}
             </div>
+            <Campo id={`concepto-${f.id}`} etiqueta="Concepto (sale en la factura)">
+              <Textarea id={`concepto-${f.id}`} rows={2} value={concepto} onChange={(e) => setConcepto(e.target.value)} />
+            </Campo>
             <div className="rounded-lg border bg-background p-3">
-              <div>{f.concepto ?? TIPOS_FACTURA[f.tipo]}</div>
+              <div className="text-muted-foreground">{TIPOS_FACTURA[f.tipo]}</div>
               <div className="mt-2 grid grid-cols-[1fr_auto] gap-x-4 text-muted-foreground">
                 <span>Base</span><span className="text-right">{formatoEuros(f.importe)}</span>
                 <span>IVA {f.iva_pct} %</span><span className="text-right">{formatoEuros(iva)}</span>
@@ -288,11 +330,23 @@ export function AccionesFactura({ f, datos, editar }: { f: Factura; datos: Datos
                 <span className="font-semibold text-foreground">Total</span><span className="text-right font-semibold text-foreground">{formatoEuros(total)}</span>
               </div>
             </div>
-            <p className="text-[13px] text-muted-foreground">El CRM hace el PDF con la plantilla de la hoja “Emitir” y lo guarda en 03. FINANCIERO/01. FACTURAS/01. PENDIENTE SARA/01. EMITIDAS.</p>
+            {vista && (
+              <div className="grid gap-1.5">
+                <iframe title="Vista previa de la factura" src={vista.url} className="h-[60dvh] w-full rounded-lg border bg-white" />
+                <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
+                  {vistaAlDia ? "Número provisional: el definitivo se pone al emitir." : "Has cambiado algo: vuelve a ver el PDF antes de emitir."}
+                  <a href={vista.url} target="_blank" rel="noreferrer" className="ml-auto">Abrir en otra pestaña</a>
+                </div>
+              </div>
+            )}
+            <p className="text-[13px] text-muted-foreground">Al emitir, el PDF se guarda en 03. FINANCIERO/01. FACTURAS/01. PENDIENTE SARA/01. EMITIDAS.</p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogo(null)}>Cancelar</Button>
-            <Button disabled={ocupado || faltanDatos} onClick={emitir}>{ocupado ? "Emitiendo…" : "Emitir"}</Button>
+            <Button variant={vistaAlDia ? "outline" : "default"} disabled={generandoVista || faltanDatos} onClick={verPdf}>
+              {generandoVista ? "Preparando el PDF…" : vista ? "Volver a ver el PDF" : "Ver PDF"}
+            </Button>
+            <Button disabled={ocupado || faltanDatos || !vistaAlDia} onClick={emitir}>{ocupado ? "Emitiendo…" : "Emitir"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

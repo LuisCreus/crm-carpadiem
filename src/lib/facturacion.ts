@@ -43,6 +43,15 @@ export function conceptoMensualidad(fecha: string): string {
   return `Honorarios correspondientes a servicio de CARPAS en ${MESES[Number(fecha.slice(5, 7)) - 1]} de ${fecha.slice(0, 4)}`;
 }
 
+export const CONCEPTO_RESERVA = 'Honorarios correspondientes a "primer pago y reserva de material"';
+
+// Concepto que se propone al emitir (siempre editable): la reserva tiene el suyo; el resto,
+// "… servicio de CARPAS en {MES} de {AÑO}" con el mes de emisión. Lo escrito a mano se respeta.
+export function conceptoAlEmitir(f: Pick<Factura, "tipo" | "concepto" | "automatica">, hoy: string): string {
+  if (!f.automatica && f.concepto?.trim()) return f.concepto;
+  return f.tipo === "reserva" ? CONCEPTO_RESERVA : conceptoMensualidad(hoy);
+}
+
 // "FACTURA CD 26 CARLOTA DURÁN.pdf", con el nombre de a quién se factura (como las de 01. PENDIENTE SARA)
 export function nombreArchivoFactura(numero: number, facturadoA: string): string {
   return `FACTURA CD ${numero} ${limpiarNombre(facturadoA).toLocaleUpperCase("es-ES")}.pdf`;
