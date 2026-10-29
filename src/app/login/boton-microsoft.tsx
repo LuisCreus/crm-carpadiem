@@ -15,6 +15,9 @@ export function BotonMicrosoft() {
       options: {
         scopes: "email profile",
         redirectTo: `${window.location.origin}/auth/callback`,
+        // Pedir siempre usuario y contraseña de Microsoft, en vez de entrar
+        // con la cuenta que ya esté abierta en el navegador
+        queryParams: { prompt: "login" },
       },
     });
   }
