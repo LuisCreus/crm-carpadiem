@@ -20,7 +20,8 @@ CRM web de CARPADIEM IBÉRICA S.L. para gestionar leads, presupuestos (con la pl
 | 10 | Arreglos tras revisar el flujo con los datos reales | Hecha |
 | 11 | Facturación: qué falta por facturar, numeración CD AAAA/n, pagadas = cobros | Hecha |
 | 12 | PDF de las facturas con la plantilla de la hoja Emitir (02. PLANTILLAS/03. FACTURAS) → PENDIENTE SARA | Hecha |
-| 13–16 | Correo con Outlook, facturas recibidas, pagos Santander, rentabilidad y gestoría | Pendiente |
+| 13 | Botón «Correo»: borrador en Outlook (lcreus@carpa-diem.com) con el PDF de la factura | Hecha |
+| 14–16 | Facturas recibidas, pagos Santander, rentabilidad y gestoría | Pendiente |
 
 ## Piezas
 
