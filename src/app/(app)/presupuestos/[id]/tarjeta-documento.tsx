@@ -135,7 +135,9 @@ export function TarjetaDocumento({ p, versiones }: { p: Presupuesto; versiones: 
   }
 
   const tienePdf = (v: Version) => Boolean(v.pdf_item_id || v.pdf_storage);
-  const nombreUltima = nombreArchivoPresupuesto(p.numero, cliente, ultima?.version ?? 1, "docx").replace(/\.docx$/, "");
+  // Los importados conservan el nombre que ya tenían en SharePoint
+  const nombreUltima = ultima?.nombre_archivo?.replace(/\.(docx|pdf)$/i, "")
+    ?? nombreArchivoPresupuesto(p.numero, cliente, ultima?.version ?? 1, "docx").replace(/\.docx$/, "");
 
   return (
     <section className="rounded-xl border bg-card p-5">
@@ -197,7 +199,7 @@ export function TarjetaDocumento({ p, versiones }: { p: Presupuesto; versiones: 
           <li key={v.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t py-2.5 text-sm">
             <span className="w-9 font-semibold">{vv(v.version)}</span>
             <span className="min-w-0 flex-1 text-muted-foreground">
-              {v.pdf_generado_at ? `PDF ${formatoFecha(v.pdf_generado_at)}` : v.docx_item_id ? "Solo Word" : "Sin documento"}
+              {v.pdf_generado_at ? `PDF ${formatoFecha(v.pdf_generado_at)}` : tienePdf(v) ? "PDF" : v.docx_item_id ? "Solo Word" : "Sin documento"}
               {v.enviado_at && ` · enviada ${formatoFecha(v.enviado_at)}`}
             </span>
             <span>{formatoEuros(v.importe !== null ? Number(v.importe) : null)}</span>
