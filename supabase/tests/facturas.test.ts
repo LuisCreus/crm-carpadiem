@@ -72,6 +72,13 @@ describe("plan de facturas del evento", () => {
     expect(lista.map((f) => [f.tipo, f.importe, f.automatica])).toEqual([["reserva", "2500.00", false], ["resto", "7500.00", true]]);
   });
 
+  it("si se quita la reserva, no se vuelve a crear y todo va en el resto", async () => {
+    const { eventoId } = await presupuestoAceptado(10000, 30);
+    const reserva = (await facturas(eventoId)).find((f) => f.tipo === "reserva")!;
+    await como(() => db.query("select public.papelera_mover('facturas', $1)", [reserva.id]));
+    expect((await facturas(eventoId)).map((f) => [f.tipo, f.importe])).toEqual([["resto", "10000.00"]]);
+  });
+
   it("si se cancela el evento, desaparecen las previstas", async () => {
     const { presupuestoId, eventoId } = await presupuestoAceptado(10000, 30);
     await como(() => db.query("update public.presupuestos set estado = 'rechazado' where id = $1", [presupuestoId]));
