@@ -16,7 +16,10 @@ CRM web de CARPADIEM IBÉRICA S.L. para gestionar leads, presupuestos (con la pl
 | 5 | Montajes, hoja de montaje, material, inventario, avisos, Inicio y búsqueda | Hecha |
 | 6 | Móvil: PWA instalable y diseño en vertical | Hecha |
 | 7 | Copias de seguridad semanales en Excel | Hecha |
-| 8–9 | Demo con el equipo, producción | Pendiente (la demo ya está en https://crm-carpadiem.vercel.app) |
+| 8–9 | Demo con el equipo y producción (datos del Excel importados, carpetas reales) | Hecha |
+| 10 | Arreglos tras revisar el flujo con los datos reales | Hecha |
+| 11 | Facturación: qué falta por facturar, numeración CD AAAA/n, pagadas = cobros | Hecha |
+| 12–16 | Emitir PDF con la plantilla del Excel, correo, facturas recibidas, pagos Santander, rentabilidad | Pendiente |
 
 ## Piezas
 
@@ -70,6 +73,7 @@ src/
       leads/             Alta rápida, Kanban y tabla
       eventos/           Lista y ficha: seguro de lluvia, montaje, hoja de montaje y material
       planificacion/     12 meses, calendario mensual y semanal (montajes en colores)
+      facturas/          Por emitir, emitidas sin cobrar y pagadas
       inventario/        Material y avisos de solapes
       intermediarios/    Wedding planners, fincas… con historial
       ajustes/           Solo admin: usuarios, dominios permitidos y numeración por año
