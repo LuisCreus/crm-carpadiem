@@ -56,3 +56,24 @@ export function conceptoAlEmitir(f: Pick<Factura, "tipo" | "concepto" | "automat
 export function nombreArchivoFactura(numero: number, facturadoA: string): string {
   return `FACTURA CD ${numero} ${limpiarNombre(facturadoA).toLocaleUpperCase("es-ES")}.pdf`;
 }
+
+// Texto del correo que acompaña a la factura (se puede cambiar antes de prepararlo)
+export function textoCorreoFactura(f: { codigo: string | null; tipo: string; importe: number; iva_pct: number; suplidos: number }, nombre: string | null) {
+  const { total } = totalFactura(f);
+  const importe = total.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" });
+  return {
+    asunto: `Factura ${f.codigo} · Carpa Diem`,
+    texto: [
+      `Hola${nombre ? ` ${nombre}` : ""},`,
+      "",
+      `Te adjuntamos la factura ${f.codigo}${f.tipo === "reserva" ? " correspondiente a la reserva" : ""} por importe de ${importe} € (IVA incluido).`,
+      "",
+      "Puedes abonarla por transferencia a la cuenta ES33 0049 5119 1721 1716 1045, indicando el número de factura.",
+      "",
+      "Muchas gracias.",
+      "",
+      "Un saludo,",
+      "Carpa Diem",
+    ].join("\n"),
+  };
+}

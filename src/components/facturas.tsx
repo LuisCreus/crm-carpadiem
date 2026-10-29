@@ -2,9 +2,9 @@
 
 // Piezas de facturación que comparten la ficha del evento y la pantalla Facturas.
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
-import { Download, Share2 } from "lucide-react";
+import { Download, Mail, Share2 } from "lucide-react";
 import { Campo, claseSelect } from "@/components/campo";
 import { Etiqueta } from "@/components/etiqueta-estado";
 import { Button } from "@/components/ui/button";
@@ -14,9 +14,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { crearClienteNavegador } from "@/lib/supabase/client";
 import { moverAPapelera } from "@/lib/datos/papelera";
 import type { DatosFacturacion, Factura, TipoFactura } from "@/lib/datos/tipos";
-import { ESTADOS_FACTURA, TIPOS_FACTURA, conceptoAlEmitir, totalFactura } from "@/lib/facturacion";
+import { ESTADOS_FACTURA, TIPOS_FACTURA, conceptoAlEmitir, textoCorreoFactura, totalFactura } from "@/lib/facturacion";
 import { formatoEuros, formatoFecha, hoyMadrid, leerEuros } from "@/lib/formato";
 import { generarPdfFactura } from "@/lib/facturas-pdf";
+import { estadoCorreo, prepararCorreoFactura } from "@/lib/correo-facturas";
 
 export function EtiquetaFactura({ f }: { f: Pick<Factura, "estado"> }) {
   const e = ESTADOS_FACTURA[f.estado];
@@ -170,7 +171,7 @@ export function DialogoFactura({ cerrar, factura, eventoId, clienteId, inicial }
 
 // Botones de una factura según su estado: Emitir · Marcar pagada · Deshacer pago · Editar · Quitar
 export function AccionesFactura({ f, datos, editar }: { f: Factura; datos: DatosFacturacion; editar?: () => void }) {
-  const [dialogo, setDialogo] = useState<"emitir" | "pagar" | "datos" | null>(null);
+  const [dialogo, setDialogo] = useState<"emitir" | "pagar" | "datos" | "correo" | null>(null);
   const [fechaPago, setFechaPago] = useState(hoyMadrid());
   const faltanDatos = !datos.fact_nombre || !datos.fact_nif;
   const [ocupado, setOcupado] = useState(false);
@@ -296,6 +297,9 @@ export function AccionesFactura({ f, datos, editar }: { f: Factura; datos: Datos
           <Button size="icon-sm" variant="ghost" aria-label={`Compartir PDF de ${f.codigo}`} onClick={compartir}>
             <Share2 className="size-3.5" aria-hidden />
           </Button>
+          <Button size="sm" variant="outline" onClick={() => setDialogo("correo")}>
+            <Mail className="size-3.5" aria-hidden /> Correo
+          </Button>
         </>
       ) : (
         <Button size="sm" variant="ghost" disabled={ocupado} onClick={pdf}>Generar PDF</Button>
@@ -351,6 +355,8 @@ export function AccionesFactura({ f, datos, editar }: { f: Factura; datos: Datos
         </DialogContent>
       </Dialog>
 
+      {dialogo === "correo" && <DialogoCorreo f={f} email={f.fact_email ?? datos.fact_email} cerrar={() => setDialogo(null)} />}
+
       {dialogo === "datos" && f.cliente_id && (
         <DialogoDatosFacturacion cerrar={() => setDialogo("emitir")} clienteId={f.cliente_id} eventoId={f.evento_id ?? undefined}
           inicial={datos} inicialSoloEvento={Boolean((datos as { deOtro?: boolean }).deOtro)} />
@@ -375,6 +381,76 @@ export function AccionesFactura({ f, datos, editar }: { f: Factura; datos: Datos
   );
 }
 
+// Correo: prepara un borrador en Outlook con el PDF adjunto; se revisa y se envía desde Outlook
+function DialogoCorreo({ f, email, cerrar }: { f: Factura; email: string | null; cerrar: () => void }) {
+  const inicial = textoCorreoFactura(f, null);
+  const [para, setPara] = useState(f.correo_para ?? email ?? "");
+  const [asunto, setAsunto] = useState(inicial.asunto);
+  const [texto, setTexto] = useState(inicial.texto);
+  const [ocupado, setOcupado] = useState(false);
+  const [estado, setEstado] = useState<{ configurado: boolean; buzon: string | null } | null>(null);
+  useEffect(() => {
+    estadoCorreo().then(setEstado).catch(() => setEstado({ configurado: false, buzon: null }));
+  }, []);
+
+  async function preparar() {
+    setOcupado(true);
+    // La pestaña se abre ya (si se abre después de esperar, el navegador la bloquea)
+    const ventana = window.open("", "_blank");
+    const r = await prepararCorreoFactura(f.id, { para, asunto, texto });
+    setOcupado(false);
+    if (!r.ok) {
+      ventana?.close();
+      return toast.error(r.error, { duration: 12000 });
+    }
+    if (ventana) ventana.location.href = r.webLink;
+    else window.location.href = r.webLink;
+    toast.success("Borrador preparado en Outlook ✓ · revísalo y pulsa Enviar", { duration: 10000 });
+    cerrar();
+  }
+
+  // Sin correo configurado: se abre el correo con el texto y se adjunta el PDF a mano
+  const mailto = `mailto:${encodeURIComponent(para)}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(texto)}`;
+
+  return (
+    <Dialog open onOpenChange={(a) => !a && cerrar()}>
+      <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Enviar {f.codigo} por correo</DialogTitle>
+          <DialogDescription>
+            {estado?.configurado
+              ? `Se prepara un borrador en Outlook (${estado.buzon}) con el PDF adjunto. Lo revisas y lo envías tú.`
+              : "Se abrirá tu correo con el texto; adjunta el PDF que se descarga."}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4">
+          <Campo id={`co-para-${f.id}`} etiqueta="Para">
+            <Input id={`co-para-${f.id}`} type="email" multiple value={para} onChange={(e) => setPara(e.target.value)} placeholder="cliente@correo.com" />
+          </Campo>
+          <Campo id={`co-asunto-${f.id}`} etiqueta="Asunto">
+            <Input id={`co-asunto-${f.id}`} value={asunto} onChange={(e) => setAsunto(e.target.value)} />
+          </Campo>
+          <Campo id={`co-texto-${f.id}`} etiqueta="Mensaje">
+            <Textarea id={`co-texto-${f.id}`} rows={10} value={texto} onChange={(e) => setTexto(e.target.value)} />
+          </Campo>
+          <p className="text-[13px] text-muted-foreground">Adjunto: {f.pdf_nombre ?? `FACTURA ${f.codigo}.pdf`}</p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={cerrar}>Cancelar</Button>
+          {estado && !estado.configurado ? (
+            <>
+              <Button variant="outline" render={<a href={`/api/factura/${f.id}`} />}>Descargar PDF</Button>
+              <Button render={<a href={mailto} />}>Abrir correo</Button>
+            </>
+          ) : (
+            <Button disabled={ocupado || !estado || !para.trim()} onClick={preparar}>{ocupado ? "Preparando…" : "Preparar en Outlook"}</Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // Una línea de factura (ficha del evento y pantalla Facturas)
 export function LineaFactura({ f, datos, editar, extra }: { f: Factura; datos: DatosFacturacion; editar?: () => void; extra?: React.ReactNode }) {
   const { total } = totalFactura(f);
@@ -387,7 +463,7 @@ export function LineaFactura({ f, datos, editar, extra }: { f: Factura; datos: D
           <EtiquetaFactura f={f} />
         </div>
         <div className="truncate text-[13px] text-muted-foreground">
-          {[extra, f.concepto, f.fecha_emision && `emitida ${formatoFecha(f.fecha_emision)}`, f.fecha_pago && `pagada ${formatoFecha(f.fecha_pago)}`].filter(Boolean).map((t, i) => <span key={i}>{i > 0 && " · "}{t}</span>)}
+          {[extra, f.concepto, f.fecha_emision && `emitida ${formatoFecha(f.fecha_emision)}`, f.correo_preparado_at && `correo ${formatoFecha(f.correo_preparado_at)}`, f.fecha_pago && `pagada ${formatoFecha(f.fecha_pago)}`].filter(Boolean).map((t, i) => <span key={i}>{i > 0 && " · "}{t}</span>)}
         </div>
       </div>
       <div className="text-right">

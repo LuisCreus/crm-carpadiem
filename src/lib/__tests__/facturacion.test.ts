@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { conceptoAlEmitir, conceptoMensualidad, resumenFacturacion, totalFactura } from "../facturacion";
+import { conceptoAlEmitir, conceptoMensualidad, resumenFacturacion, textoCorreoFactura, totalFactura } from "../facturacion";
 import type { Factura } from "../datos/tipos";
 
 const f = (tipo: Factura["tipo"], estado: Factura["estado"], importe: number) => ({ tipo, estado, importe, iva_pct: 21, suplidos: 0 }) as Factura;
@@ -26,5 +26,11 @@ describe("facturación", () => {
     expect(conceptoAlEmitir({ tipo: "resto", concepto: "… en JULIO de 2027", automatica: true }, hoy))
       .toBe("Honorarios correspondientes a servicio de CARPAS en NOVIEMBRE de 2026");
     expect(conceptoAlEmitir({ tipo: "otra", concepto: "Alquiler de tarima", automatica: false }, hoy)).toBe("Alquiler de tarima");
+  });
+
+  it("texto del correo con el total con IVA", () => {
+    const c = textoCorreoFactura({ codigo: "CD 2026/26", tipo: "reserva", importe: 3000, iva_pct: 21, suplidos: 0 }, null);
+    expect(c.asunto).toBe("Factura CD 2026/26 · Carpa Diem");
+    expect(c.texto).toContain("factura CD 2026/26 correspondiente a la reserva por importe de 3.630,00 € (IVA incluido)");
   });
 });
