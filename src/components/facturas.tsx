@@ -271,6 +271,22 @@ export function AccionesFactura({ f, datos, editar }: { f: Factura; datos: Datos
   }
 
   async function quitar() {
+    // El Resto es "lo que falta por facturar": quitarlo significa que al cliente se le factura menos.
+    // Se ajusta el total del presupuesto a lo ya facturado y así deja de quedar pendiente.
+    if (f.tipo === "resto" && f.automatica && f.evento_id) {
+      const [{ data: ev }, { data: emitidas }] = await Promise.all([
+        sb.from("eventos").select("presupuesto_id, importe").eq("id", f.evento_id).maybeSingle(),
+        sb.from("facturas").select("importe").eq("evento_id", f.evento_id).neq("estado", "prevista").neq("tipo", "mensualidad").is("deleted_at", null),
+      ]);
+      const facturado = (emitidas ?? []).reduce((s, x) => s + Number(x.importe), 0);
+      if (!ev?.presupuesto_id || facturado <= 0) {
+        return toast.error("Este evento no tiene nada facturado todavía: cambia el importe del presupuesto o márcalo como caído.", { duration: 10000 });
+      }
+      if (!window.confirm(`¿No se va a facturar el resto (${formatoEuros(f.importe)})?\n\nEl total del presupuesto pasa de ${formatoEuros(Number(ev.importe))} a ${formatoEuros(facturado)}, que es lo ya facturado, y deja de quedar pendiente.`)) return;
+      const { error } = await sb.from("presupuestos").update({ importe: facturado }).eq("id", ev.presupuesto_id);
+      if (error) return toast.error(error.message);
+      return toast.success(`Resto quitado ✓ · el total queda en ${formatoEuros(facturado)}`);
+    }
     if (!window.confirm("¿Quitar esta factura por emitir? Lo que falte se ajusta en “Resto”.")) return;
     try {
       await moverAPapelera("facturas", f.id);
