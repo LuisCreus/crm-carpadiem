@@ -38,7 +38,7 @@ export function Inicio() {
     ["presupuestos", "eventos", "cobros", "leads", "clientes", "ajustes"],
     async (sb) => {
       const [pr, ev, co, le, aj] = await Promise.all([
-        sb.from("presupuestos").select("id, codigo, estado, enviado_at, importe, reserva_pct, cliente_id, cliente:clientes(nombre)").is("deleted_at", null),
+        sb.from("presupuestos").select("id, codigo, anio, estado, enviado_at, importe, reserva_pct, cliente_id, cliente:clientes(nombre)").is("deleted_at", null),
         sb.from("eventos").select("id, presupuesto_id, cliente_id, estado, modalidad, fecha_precision, fecha_inicio, fecha_fin, montaje_inicio, desmontaje_inicio, importe, ubicacion, provincia, material, tipo_evento, cliente:clientes(nombre)")
           .is("deleted_at", null),
         sb.from("cobros").select("presupuesto_id, importe").is("deleted_at", null),

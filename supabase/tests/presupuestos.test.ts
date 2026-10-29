@@ -107,6 +107,13 @@ describe("enviar, aceptar y opciones", () => {
     expect(ev.rows[0].estado).toBe("activo");
   });
 
+  it("se puede aceptar un presupuesto sin tipo de evento (como los importados)", async () => {
+    const p = await crear({ ...BASE, tipo_evento: null });
+    await como(() => db.query("select public.aceptar_presupuesto($1)", [p.id]));
+    const ev = await db.query<{ es_larga_duracion: boolean }>("select es_larga_duracion from public.eventos where presupuesto_id = $1", [p.id]);
+    expect(ev.rows[0].es_larga_duracion).toBe(false);
+  });
+
   it("aceptar marca el lead como Ganado", async () => {
     const lead = await como(async () => {
       const { rows } = await db.query<{ id: string }>(

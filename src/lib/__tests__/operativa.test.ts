@@ -110,6 +110,16 @@ describe("números del Inicio", () => {
     expect(numerosPeriodo(lista, "2026").enviados).toBe(4);
   });
 
+  it("los importados sin fecha de envío cuentan en el año de su número, no en el mes", () => {
+    const lista = [
+      { ...p("pagado", null, 4000), anio: 2026 },
+      { ...p("caducado", null, 1000), anio: 2026 },
+      { ...p("borrador", null, 500), anio: 2026 },
+    ];
+    expect(numerosPeriodo(lista, "2026")).toEqual({ enviados: 2, aceptados: 1, tasaAceptacion: 0.5, presupuestado: 5000, aceptado: 4000 });
+    expect(numerosPeriodo(lista, "2026-10").enviados).toBe(0);
+  });
+
   it("reservas cobradas frente a pendientes", () => {
     expect(reservas([p("aceptado", null, 10000, 30, 1000), p("reserva_pagada", null, 1000, 30, 300)]))
       .toEqual({ cobradas: 1300, pendientes: 2000 });

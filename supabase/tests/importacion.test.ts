@@ -2,14 +2,14 @@
 // Solo se ejecuta si se indica el archivo:  IMPORTACION_SQL=<ruta.sql> npx vitest run importacion
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { crearBaseDePrueba, crearUsuario } from "./pg-prueba";
+import { comoUsuario, crearBaseDePrueba, crearUsuario } from "./pg-prueba";
 
 const archivo = process.env.IMPORTACION_SQL;
 
 describe.skipIf(!archivo)("importación de prueba", () => {
   it("se aplica entera y deja los estados revisados", async () => {
     const db = await crearBaseDePrueba();
-    await crearUsuario(db, "lcreus@carpa-diem.com");
+    const luis = await crearUsuario(db, "lcreus@carpa-diem.com");
     // Dos veces: la segunda vacía lo anterior (como al pasar de las pruebas a producción)
     await db.exec(readFileSync(archivo!, "utf8"));
     await db.exec(readFileSync(archivo!, "utf8"));
@@ -25,5 +25,11 @@ describe.skipIf(!archivo)("importación de prueba", () => {
     console.log("Enlaces:", enlaces, await q("select count(docx_item_id)::int word, count(pdf_item_id)::int pdf from public.presupuesto_versiones"));
     console.log("Rechazados:", await q("select codigo, motivo_rechazo from public.presupuestos where estado = 'rechazado' order by numero"));
     expect((enlaces[0] as { enviados: number }).enviados).toBe(0);
+
+    // Después de importar se pueden aceptar y cambiar de estado
+    const pendientes = (await q("select id from public.presupuestos where estado = 'pendiente' order by numero")) as { id: string }[];
+    for (const p of pendientes) await comoUsuario(db, luis, () => db.query("select public.aceptar_presupuesto($1)", [p.id]));
+    const caducado = (await q("select id from public.presupuestos where estado = 'caducado' limit 1")) as { id: string }[];
+    await comoUsuario(db, luis, () => db.query("update public.presupuestos set estado = 'rechazado' where id = $1", [caducado[0].id]));
   });
 });

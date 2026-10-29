@@ -198,7 +198,7 @@ function formatoCorto(fecha: string) {
 // Números del mes y del año
 // ---------------------------------------------------------------------
 
-export type PresupuestoNumeros = { estado: EstadoPresupuesto; enviado_at: string | null; importe: number | null; reserva_pct: number | null };
+export type PresupuestoNumeros = { estado: EstadoPresupuesto; enviado_at: string | null; importe: number | null; reserva_pct: number | null; anio?: number };
 export type Numeros = {
   enviados: number;
   aceptados: number;
@@ -209,9 +209,17 @@ export type Numeros = {
 
 const ACEPTADOS: EstadoPresupuesto[] = ["aceptado", "reserva_pagada", "pagado"];
 
-// Sobre los presupuestos ENVIADOS en el periodo (aaaa-mm o aaaa)
+// Sobre los presupuestos ENVIADOS en el periodo (aaaa-mm o aaaa). Los importados del
+// Excel no tienen fecha de envío: cuentan en el año de su número, pero no en ningún mes.
+// Las "Descartada" no cuentan: son otras opciones de una oportunidad que ya se aceptó.
+function enviadoEn(p: PresupuestoNumeros, periodo: string): boolean {
+  if (p.estado === "descartada") return false;
+  if (p.enviado_at) return diaDe(p.enviado_at)!.startsWith(periodo);
+  return periodo.length === 4 && p.estado !== "borrador" && String(p.anio) === periodo;
+}
+
 export function numerosPeriodo(presupuestos: PresupuestoNumeros[], periodo: string): Numeros {
-  const delPeriodo = presupuestos.filter((p) => p.enviado_at && diaDe(p.enviado_at)!.startsWith(periodo));
+  const delPeriodo = presupuestos.filter((p) => enviadoEn(p, periodo));
   const aceptadosLista = delPeriodo.filter((p) => ACEPTADOS.includes(p.estado));
   return {
     enviados: delPeriodo.length,
