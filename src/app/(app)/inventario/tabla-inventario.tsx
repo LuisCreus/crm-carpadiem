@@ -14,7 +14,7 @@ import { useTablaEnVivo } from "@/hooks/use-tabla-en-vivo";
 import { crearClienteNavegador } from "@/lib/supabase/client";
 import { moverAPapelera } from "@/lib/datos/papelera";
 import { uno } from "@/lib/datos/tipos";
-import { formatoFecha } from "@/lib/formato";
+import { formatoFecha, hoyMadrid } from "@/lib/formato";
 import { rangoOcupacion, solapesMaterial, type EventoOcupacion, type Solape } from "@/lib/operativa";
 
 type Item = { id: string; material: string; cantidad: number; unidad: string; propiedad: "propio" | "subalquilado"; notas: string | null };
@@ -23,7 +23,7 @@ type Datos = { items: Item[]; solapes: Solape[] };
 export function TablaInventario() {
   const sb = crearClienteNavegador();
   const { datos, cargando } = useTablaEnVivo<Datos>(["inventario", "evento_material", "eventos"], async (s) => {
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = hoyMadrid();
     const [inv, res, ev] = await Promise.all([
       s.from("inventario").select("id, material, cantidad, unidad, propiedad, notas").is("deleted_at", null).order("material"),
       s.from("evento_material").select("evento_id, inventario_id, cantidad"),

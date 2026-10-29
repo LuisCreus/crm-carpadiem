@@ -4,7 +4,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { MapPin, Phone } from "lucide-react";
-import { Campo } from "@/components/campo";
+import { Campo, claseSelect } from "@/components/campo";
 import { Etiqueta, EtiquetaEstado, CLASE_CONFIRMADO, CLASE_SEGURO } from "@/components/etiqueta-estado";
 import { HistorialDialogo } from "@/components/historial-dialogo";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import { nombreDe, useListas } from "@/hooks/use-listas";
 import { crearClienteNavegador } from "@/lib/supabase/client";
 import { SELECT_EVENTO, uno, type Contacto, type Evento } from "@/lib/datos/tipos";
 import { formatoEuros, formatoFecha } from "@/lib/formato";
-import { diaSemana, enlaceMaps, fechaLimiteSeguro, textoFechaEvento } from "@/lib/negocio";
+import { diaSemana, enlaceMaps, fechaLimiteSeguro, textoFechaEvento, type PrecisionFecha } from "@/lib/negocio";
 import { rangoOcupacion, solapesMaterial, type EventoOcupacion, type Solape } from "@/lib/operativa";
 import { TarjetaMontaje } from "./montaje";
 import {
@@ -32,6 +32,7 @@ type Datos = {
   reservas: ReservaMaterial[];
   inventario: ItemInventario[];
   solapes: Solape[];
+  diasSeguro: number;
 };
 
 function Tarjeta({ titulo, accion, children }: { titulo: string; accion?: ReactNode; children: ReactNode }) {
@@ -55,7 +56,7 @@ export function FichaEvento({ id }: { id: string }) {
       const { data, error } = await sb.from("eventos").select(SELECT_EVENTO).eq("id", id).maybeSingle();
       if (error) throw new Error(error.message);
       if (!data) return [];
-      const [ct, co, mo, mv, res, inv, todos] = await Promise.all([
+      const [ct, co, mo, mv, res, inv, todos, aj] = await Promise.all([
         sb.from("contactos").select("id, nombre, rol, telefono, email").eq("cliente_id", data.cliente_id).is("deleted_at", null).order("orden"),
         data.presupuesto_id
           ? sb.from("cobros").select("importe").eq("presupuesto_id", data.presupuesto_id).is("deleted_at", null)
@@ -66,6 +67,7 @@ export function FichaEvento({ id }: { id: string }) {
         sb.from("inventario").select("id, material, cantidad, unidad").is("deleted_at", null).order("material"),
         sb.from("eventos").select("id, fecha_precision, fecha_inicio, fecha_fin, montaje_inicio, desmontaje_inicio, desmontaje_fin, cliente:clientes(nombre)")
           .eq("estado", "activo").is("deleted_at", null),
+        sb.from("ajustes").select("dias_limite_seguro").maybeSingle(),
       ]);
       const reservasTodas = (res.data ?? []) as (ReservaMaterial & { evento_id: string })[];
       const inventario = ((inv.data ?? []) as ItemInventario[]).map((i) => ({ ...i, cantidad: Number(i.cantidad) }));
@@ -83,6 +85,7 @@ export function FichaEvento({ id }: { id: string }) {
         reservas: reservasTodas.filter((r) => r.evento_id === id),
         inventario,
         solapes: solapesMaterial(ocupacion, inventario).filter((s) => s.eventoIds.includes(id)),
+        diasSeguro: aj.data?.dias_limite_seguro ?? 10,
       }];
     },
   );
@@ -93,7 +96,7 @@ export function FichaEvento({ id }: { id: string }) {
   const { e, contactos, cobrado, montadores, movimientos, reservas, inventario, solapes } = d;
   const sb = crearClienteNavegador();
   const direccion = [e.ubicacion, e.provincia].filter(Boolean).join(", ");
-  const limite = e.modalidad === "seguro" && e.fecha_precision === "dia" && e.fecha_inicio ? fechaLimiteSeguro(e.fecha_inicio) : null;
+  const limite = e.modalidad === "seguro" && e.fecha_precision === "dia" && e.fecha_inicio ? fechaLimiteSeguro(e.fecha_inicio, d.diasSeguro) : null;
 
   async function actualizar(cambios: Partial<Evento>, ok: string) {
     const { error } = await sb.from("eventos").update(cambios).eq("id", e.id);
@@ -129,7 +132,7 @@ export function FichaEvento({ id }: { id: string }) {
         <div className="mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-[#F3DFB8] bg-[#FDF3E1] p-4 text-sm text-[#5C3D07]">
           <div className="min-w-0 flex-1">
             <b className="font-semibold">Seguro de lluvia.</b>{" "}
-            {limite ? `El cliente decide como tarde el ${formatoFecha(limite)} (10 días antes).` : "Pon la fecha exacta del evento para calcular el plazo."}
+            {limite ? `El cliente decide como tarde el ${formatoFecha(limite)} (${d.diasSeguro} días antes).` : "Pon la fecha exacta del evento para calcular el plazo."}
           </div>
           <Button variant="outline" className="bg-card" onClick={() => actualizar({ modalidad: "confirmado" }, "Pasa a Confirmado ✓")}>Sigue adelante</Button>
           <Button variant="outline" className="bg-card"
@@ -203,8 +206,10 @@ export function FichaEvento({ id }: { id: string }) {
 }
 
 function DialogoEditarEvento({ evento: e, cerrar }: { evento: Evento; cerrar: () => void }) {
+  const [precision, setPrecision] = useState<PrecisionFecha>(e.fecha_precision);
+  const [mes, setMes] = useState(e.fecha_precision === "mes" ? (e.fecha_inicio ?? "").slice(0, 7) : "");
   const [c, setC] = useState({
-    fecha_inicio: e.fecha_inicio ?? "",
+    fecha_inicio: e.fecha_precision === "dia" ? e.fecha_inicio ?? "" : "",
     fecha_fin: e.fecha_fin ?? "",
     ubicacion: e.ubicacion ?? "",
     provincia: e.provincia ?? "",
@@ -215,10 +220,12 @@ function DialogoEditarEvento({ evento: e, cerrar }: { evento: Evento; cerrar: ()
 
   async function guardar(ev: FormEvent) {
     ev.preventDefault();
+    const inicio = precision === "dia" ? c.fecha_inicio : precision === "mes" && mes ? `${mes}-01` : null;
+    if (precision !== "por_definir" && !inicio) return toast.error("Falta la fecha");
     const { error } = await crearClienteNavegador().from("eventos").update({
-      fecha_inicio: c.fecha_inicio || null,
-      fecha_fin: c.fecha_fin || null,
-      fecha_precision: c.fecha_inicio ? (e.fecha_precision === "por_definir" ? "dia" : e.fecha_precision) : "por_definir",
+      fecha_precision: precision,
+      fecha_inicio: inicio || null,
+      fecha_fin: precision === "dia" && c.fecha_fin ? c.fecha_fin : null,
       ubicacion: c.ubicacion.trim() || null,
       provincia: c.provincia.trim() || null,
       maps_url: c.maps_url.trim() || null,
@@ -235,15 +242,31 @@ function DialogoEditarEvento({ evento: e, cerrar }: { evento: Evento; cerrar: ()
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Editar evento</DialogTitle>
-          <DialogDescription>Para un proyecto de larga duración, pon la fecha de fin para que el material figure como ocupado.</DialogDescription>
+          <DialogDescription>Los cambios de fecha, lugar y material pasan también al presupuesto. Para un proyecto de larga duración, pon la fecha de fin para que el material figure como ocupado.</DialogDescription>
         </DialogHeader>
         <form id="form-evento" onSubmit={guardar} className="grid gap-4 sm:grid-cols-2">
-          <Campo id="e-ini" etiqueta={e.fecha_precision === "mes" ? "Fecha (día 1 = solo mes)" : "Fecha de inicio"}>
-            <Input id="e-ini" type="date" value={c.fecha_inicio} onChange={(x) => setC({ ...c, fecha_inicio: x.target.value })} />
+          <Campo id="e-precision" etiqueta="Fecha" className="sm:col-span-2">
+            <select id="e-precision" className={claseSelect} value={precision} onChange={(x) => setPrecision(x.target.value as PrecisionFecha)}>
+              <option value="dia">Fecha exacta</option>
+              <option value="mes">Solo mes y año</option>
+              <option value="por_definir">Por definir</option>
+            </select>
           </Campo>
-          <Campo id="e-fin" etiqueta="Fecha de fin">
-            <Input id="e-fin" type="date" min={c.fecha_inicio} value={c.fecha_fin} onChange={(x) => setC({ ...c, fecha_fin: x.target.value })} />
-          </Campo>
+          {precision === "dia" && (
+            <>
+              <Campo id="e-ini" etiqueta="Fecha de inicio">
+                <Input id="e-ini" type="date" value={c.fecha_inicio} onChange={(x) => setC({ ...c, fecha_inicio: x.target.value })} />
+              </Campo>
+              <Campo id="e-fin" etiqueta="Fecha de fin">
+                <Input id="e-fin" type="date" min={c.fecha_inicio} value={c.fecha_fin} onChange={(x) => setC({ ...c, fecha_fin: x.target.value })} />
+              </Campo>
+            </>
+          )}
+          {precision === "mes" && (
+            <Campo id="e-mes" etiqueta="Mes previsto">
+              <Input id="e-mes" type="month" value={mes} onChange={(x) => setMes(x.target.value)} />
+            </Campo>
+          )}
           <Campo id="e-ubi" etiqueta="Ubicación"><Input id="e-ubi" value={c.ubicacion} onChange={(x) => setC({ ...c, ubicacion: x.target.value })} /></Campo>
           <Campo id="e-prov" etiqueta="Provincia"><Input id="e-prov" value={c.provincia} onChange={(x) => setC({ ...c, provincia: x.target.value })} /></Campo>
           <Campo id="e-maps" etiqueta="Enlace de Google Maps (opcional)" className="sm:col-span-2">

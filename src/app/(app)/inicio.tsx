@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useTablaEnVivo } from "@/hooks/use-tabla-en-vivo";
 import { nombreDe, useListas } from "@/hooks/use-listas";
 import { uno } from "@/lib/datos/tipos";
-import { formatoEuros, formatoFecha } from "@/lib/formato";
+import { formatoEuros, formatoFecha, hoyMadrid } from "@/lib/formato";
 import { MESES, type EstadoPresupuesto, type PrecisionFecha } from "@/lib/negocio";
 import { calcularAvisos, numerosPeriodo, reservas, type Aviso, type TipoAviso } from "@/lib/operativa";
 import { cn } from "@/lib/utils";
@@ -31,7 +31,7 @@ type Datos = {
 
 export function Inicio() {
   const listas = useListas();
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = hoyMadrid();
   const [periodo, setPeriodo] = useState<"mes" | "anio">("mes");
 
   const { datos, cargando } = useTablaEnVivo<Datos>(
@@ -162,7 +162,7 @@ export function Inicio() {
             { label: "Presupuestos enviados", valor: String(numeros.enviados), sub: `${numeros.aceptados} aceptados`, barra: null },
             { label: "Tasa de aceptación", valor: numeros.tasaAceptacion === null ? "—" : `${Math.round(numeros.tasaAceptacion * 100)} %`, sub: `${numeros.aceptados} de ${numeros.enviados}`, barra: numeros.tasaAceptacion },
             { label: "€ aceptados", valor: formatoEuros(numeros.aceptado), sub: `de ${formatoEuros(numeros.presupuestado)} presupuestados`, barra: numeros.presupuestado ? numeros.aceptado / numeros.presupuestado : null },
-            { label: "Reservas cobradas", valor: formatoEuros(res.cobradas), sub: `${formatoEuros(res.pendientes)} pendientes`, barra: res.cobradas + res.pendientes ? res.cobradas / (res.cobradas + res.pendientes) : null },
+            { label: "Reservas cobradas", valor: formatoEuros(res.cobradas), sub: `${formatoEuros(res.pendientes)} pendientes${res.sinDatos ? ` · ${res.sinDatos} sin % de reserva` : ""}`, barra: res.cobradas + res.pendientes ? res.cobradas / (res.cobradas + res.pendientes) : null },
           ].map((k) => (
             <div key={k.label} className="rounded-xl border bg-card p-4">
               <div className="text-[13px] text-muted-foreground">{k.label}</div>

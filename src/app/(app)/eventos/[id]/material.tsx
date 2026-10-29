@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { crearClienteNavegador } from "@/lib/supabase/client";
 import { moverAPapelera } from "@/lib/datos/papelera";
-import { formatoFecha } from "@/lib/formato";
+import { formatoFecha, hoyMadrid } from "@/lib/formato";
 import { controlMaterial, type EstadoMaterial, type Solape } from "@/lib/operativa";
 
 export type MovimientoMaterial = { id: string; material: string; cantidad: number; sentido: "sale" | "entra"; fecha: string | null; notas: string | null };
@@ -23,7 +23,7 @@ const ESTADO: Record<EstadoMaterial, { texto: string; clase: string }> = {
   pendiente: { texto: "Fuera", clase: "bg-[#F2F1EE] text-[#6B6A66]" },
 };
 
-const hoy = () => new Date().toISOString().slice(0, 10);
+const hoy = () => hoyMadrid();
 
 // Material reservado del inventario (para avisar si no llega)
 export function TarjetaMaterialReservado({ eventoId, reservas, inventario, solapes }: {

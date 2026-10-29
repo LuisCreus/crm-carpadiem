@@ -230,14 +230,20 @@ export function numerosPeriodo(presupuestos: PresupuestoNumeros[], periodo: stri
   };
 }
 
-// Reservas cobradas frente a pendientes de los presupuestos aceptados
-export function reservas(presupuestos: (PresupuestoNumeros & { cobrado: number })[]): { cobradas: number; pendientes: number } {
+// Reservas cobradas frente a pendientes de los presupuestos aceptados.
+// Los que no tienen % de reserva o importe (muchos importados) no se pueden calcular: se cuentan aparte.
+export function reservas(presupuestos: (PresupuestoNumeros & { cobrado: number })[]): { cobradas: number; pendientes: number; sinDatos: number } {
   let cobradas = 0;
   let pendientes = 0;
+  let sinDatos = 0;
   for (const p of presupuestos.filter((x) => ACEPTADOS.includes(x.estado))) {
-    const reserva = Math.round((p.importe ?? 0) * (p.reserva_pct ?? 0)) / 100;
+    if (p.reserva_pct === null || p.importe === null) {
+      sinDatos++;
+      continue;
+    }
+    const reserva = Math.round(p.importe * p.reserva_pct) / 100;
     cobradas += Math.min(p.cobrado, reserva || p.cobrado);
     pendientes += Math.max(reserva - p.cobrado, 0);
   }
-  return { cobradas, pendientes };
+  return { cobradas, pendientes, sinDatos };
 }

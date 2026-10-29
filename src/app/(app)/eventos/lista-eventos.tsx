@@ -8,7 +8,7 @@ import { Etiqueta, CLASE_CONFIRMADO, CLASE_SEGURO } from "@/components/etiqueta-
 import { Button } from "@/components/ui/button";
 import { textoCobro, useEventos } from "@/hooks/use-eventos";
 import { nombreDe, useListas } from "@/hooks/use-listas";
-import { formatoEuros } from "@/lib/formato";
+import { formatoEuros, hoyMadrid } from "@/lib/formato";
 import { MESES, textoFechaEvento } from "@/lib/negocio";
 import { cn } from "@/lib/utils";
 
@@ -16,7 +16,7 @@ export function ListaEventos() {
   const listas = useListas();
   const { datos, cargando } = useEventos();
   const [cuales, setCuales] = useState<"proximos" | "pasados" | "cancelados">("proximos");
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = hoyMadrid();
 
   const lista = useMemo(() => {
     const fin = (e: (typeof datos)[number]) => e.fecha_fin ?? e.fecha_inicio ?? "9999";

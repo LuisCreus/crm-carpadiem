@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  avisarSeguro, diaSemana, estadoPago, fechaLimiteSeguro, importeReserva, limpiarNombre,
+  avisarSeguro, diaSemana, estadoPago, fechaLimiteSeguro, importeReserva, leerFechaAprox, limpiarNombre,
   nombreArchivoPresupuesto, nombreHojaMontaje, rutaCarpetaCliente, textoFechaEvento,
 } from "../negocio";
 
@@ -91,5 +91,15 @@ describe("textos de fecha", () => {
 
   it("día de la semana", () => {
     expect(diaSemana("2027-05-08")).toBe("sábado");
+  });
+});
+
+describe("leerFechaAprox (fecha escrita en un lead)", () => {
+  it("entiende día exacto, mes y año, y nombres de mes", () => {
+    expect(leerFechaAprox("08/05/2027")).toEqual({ precision: "dia", fecha: "2027-05-08" });
+    expect(leerFechaAprox("2027-05-08")).toEqual({ precision: "dia", fecha: "2027-05-08" });
+    expect(leerFechaAprox("6/2027")).toEqual({ precision: "mes", fecha: "2027-06-01" });
+    expect(leerFechaAprox("Junio de 2027")).toEqual({ precision: "mes", fecha: "2027-06-01" });
+    expect(leerFechaAprox("verano")).toBeNull();
   });
 });

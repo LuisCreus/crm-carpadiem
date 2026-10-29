@@ -16,7 +16,7 @@ import {
   CONCEPTOS_COBRO, SELECT_PRESUPUESTO, SELECT_PRESUPUESTO_LISTA, uno,
   type Cobro, type Contacto, type Presupuesto, type PresupuestoLista, type Version,
 } from "@/lib/datos/tipos";
-import { formatoEuros, formatoFecha, formatoFechaHora, formatoPorcentaje } from "@/lib/formato";
+import { formatoEuros, formatoFecha, formatoFechaHora, formatoPorcentaje, leerEuros } from "@/lib/formato";
 import {
   ESTADOS, ESTADOS_ACEPTADOS, ESTADOS_MANUALES, diaSemana, importeReserva,
   textoFechaEvento, type EstadoPresupuesto,
@@ -112,6 +112,8 @@ export function FichaPresupuesto({ id }: { id: string }) {
   async function cambiarEstado(estado: EstadoPresupuesto | "aceptar") {
     if (estado === "aceptar") return setDialogo("aceptar");
     if (estado === "rechazado") return setDialogo("rechazar");
+    if (aceptado && evento?.estado === "activo"
+      && !window.confirm(`Al pasar a “${ESTADOS[estado].texto}” se cancela el evento y sale de la Planificación. ¿Seguir?`)) return;
     const { error } = await sb.from("presupuestos").update({ estado }).eq("id", p.id);
     if (error) toast.error(error.message);
     else toast.success(`Estado: ${ESTADOS[estado].texto}`);
@@ -119,12 +121,12 @@ export function FichaPresupuesto({ id }: { id: string }) {
 
   async function guardarImporte() {
     const texto = window.prompt(
-      "Total SIN IVA del presupuesto (en la Fase 4 se leerá solo del PDF):",
+      "Total SIN IVA del presupuesto:",
       importe !== null ? String(importe).replace(".", ",") : "",
     );
     if (texto === null) return;
-    const valor = Number(texto.replace(/\./g, "").replace(",", ".").replace(/[^\d.]/g, ""));
-    if (!(valor >= 0)) return toast.error("Importe no válido");
+    const valor = leerEuros(texto);
+    if (valor === null || valor < 0) return toast.error("Importe no válido");
     const reservaTexto = reservaPct !== null ? ` · Reserva ${formatoPorcentaje(reservaPct)} = ${formatoEuros(importeReserva(valor, reservaPct))}` : "";
     if (!window.confirm(`Importe ${formatoEuros(valor)}${reservaTexto} — ¿Correcto?`)) return;
     const r1 = await sb.from("presupuestos").update({ importe: valor }).eq("id", p.id);
@@ -150,8 +152,10 @@ export function FichaPresupuesto({ id }: { id: string }) {
   }
 
   async function borrarPresupuesto() {
-    if (!window.confirm(`¿Mover ${p.codigo} a la papelera? El administrador podrá restaurarlo.`)) return;
+    const conEvento = evento?.estado === "activo";
+    if (!window.confirm(`¿Mover ${p.codigo} a la papelera${conEvento ? " junto con su evento" : ""}? El administrador podrá restaurarlos.`)) return;
     try {
+      if (evento) await moverAPapelera("eventos", evento.id);
       await moverAPapelera("presupuestos", p.id);
       toast.success(`${p.codigo} movido a la papelera`);
       router.push("/presupuestos");
@@ -296,6 +300,8 @@ export function FichaPresupuesto({ id }: { id: string }) {
           <Tarjeta titulo="Envío" accion={p.estado !== "borrador" && <Button variant="outline" size="sm" onClick={marcarEnviado}>Marcar V{String(ultimaVersion).padStart(2, "0")} como enviada</Button>}>
             {p.enviado_at ? (
               <p className="text-sm">V{String(p.version_enviada).padStart(2, "0")} marcada como enviada el {formatoFechaHora(p.enviado_at)}</p>
+            ) : p.version_enviada ? (
+              <p className="text-sm text-muted-foreground">V{String(p.version_enviada).padStart(2, "0")} enviada (importado del Excel, sin fecha de envío).</p>
             ) : (
               <p className="text-sm text-muted-foreground">Todavía no se ha enviado. Envíalo por Outlook y pulsa “Marcar como enviado”.</p>
             )}

@@ -14,7 +14,7 @@ import { useListas } from "@/hooks/use-listas";
 import { crearClienteNavegador } from "@/lib/supabase/client";
 import { uno } from "@/lib/datos/tipos";
 import { crearDocumento, estadoSharePoint } from "@/lib/documentos";
-import type { PrecisionFecha } from "@/lib/negocio";
+import { leerFechaAprox, type PrecisionFecha } from "@/lib/negocio";
 import { cn } from "@/lib/utils";
 
 type ContactoForm = { nombre: string; rol: string; telefono: string; email: string };
@@ -64,8 +64,21 @@ export function FormularioPresupuesto({ nombreUsuario, leadId, duplicarId, opcio
     if (leadId) {
       sb.from("leads").select("*").eq("id", leadId).maybeSingle().then(({ data: l }) => {
         if (!l) return;
-        setOrigen(`Desde el lead de ${l.cliente_nombre}`);
+        // Lo que no tiene campo propio se ve en el subtítulo para no perderlo
+        const extra = [l.fecha_evento_aprox && `fecha aprox.: ${l.fecha_evento_aprox}`, l.comentarios].filter(Boolean).join(" · ");
+        setOrigen(`Desde el lead de ${l.cliente_nombre}${extra ? ` — ${extra}` : ""}`);
         setClienteNombre(l.cliente_nombre ?? "");
+        // Si el lead ya tiene cliente, se usa el mismo (no se duplica)
+        if (l.cliente_id) {
+          sb.from("clientes").select("id, nombre, tipo_cliente").eq("id", l.cliente_id).maybeSingle()
+            .then(({ data: c }) => { if (c) setCliente(c as ClienteExistente); });
+        }
+        const f = leerFechaAprox(l.fecha_evento_aprox ?? "");
+        if (f) {
+          setPrecision(f.precision);
+          if (f.precision === "dia") setFecha(f.fecha);
+          else setMes(f.fecha.slice(0, 7));
+        }
         if (l.tipo_cliente) setTipoCliente(l.tipo_cliente);
         if (l.comercial_id) setComercialId(l.comercial_id);
         setContactos([{ nombre: l.contacto_nombre ?? l.cliente_nombre ?? "", rol: "", telefono: l.telefono ?? "", email: l.email ?? "" }]);
@@ -169,6 +182,7 @@ export function FormularioPresupuesto({ nombreUsuario, leadId, duplicarId, opcio
       const doc = await crearDocumento(creado.id, duplicarId);
       if (doc.ok) {
         toast.success(`${doc.nombre} creado ✓ · abriendo Word…`, { id });
+        if (doc.aviso) toast.warning(doc.aviso, { duration: 20000 });
         window.location.href = doc.escritorio;
       } else {
         toast.error(`El presupuesto está creado, pero el Word no: ${doc.error}`, { id });

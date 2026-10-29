@@ -114,6 +114,22 @@ describe("enviar, aceptar y opciones", () => {
     expect(ev.rows[0].es_larga_duracion).toBe(false);
   });
 
+  it("fecha, lugar y material del presupuesto y de su evento van siempre a la par", async () => {
+    const p = await crear(BASE);
+    await como(() => db.query("select public.aceptar_presupuesto($1)", [p.id]));
+    await como(() => db.query("update public.presupuestos set fecha_evento = '2027-06-12', ubicacion = 'Finca Nueva' where id = $1", [p.id]));
+    let ev = await db.query<{ fecha_inicio: string; ubicacion: string }>(
+      "select fecha_inicio::text, ubicacion from public.eventos where presupuesto_id = $1", [p.id]);
+    expect(ev.rows[0]).toEqual({ fecha_inicio: "2027-06-12", ubicacion: "Finca Nueva" });
+
+    await como(() => db.query("update public.eventos set fecha_precision = 'dia', fecha_inicio = '2027-06-19', material = '3 beduinas' where presupuesto_id = $1", [p.id]));
+    const pr = await db.query<{ fecha_evento: string; material: string }>(
+      "select fecha_evento::text, material from public.presupuestos where id = $1", [p.id]);
+    expect(pr.rows[0]).toEqual({ fecha_evento: "2027-06-19", material: "3 beduinas" });
+    ev = await db.query("select fecha_inicio::text, ubicacion from public.eventos where presupuesto_id = $1", [p.id]);
+    expect(ev.rows[0]).toEqual({ fecha_inicio: "2027-06-19", ubicacion: "Finca Nueva" });
+  });
+
   it("aceptar marca el lead como Ganado", async () => {
     const lead = await como(async () => {
       const { rows } = await db.query<{ id: string }>(

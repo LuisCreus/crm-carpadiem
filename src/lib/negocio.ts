@@ -128,3 +128,18 @@ export function nombreHojaMontaje(numero: number, cliente: string): string {
 export function enlaceMaps(direccion: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(direccion)}`;
 }
+
+// Fecha aproximada escrita a mano en un lead: "08/05/2027", "2027-05-08", "05/2027", "junio 2027"
+export function leerFechaAprox(texto: string): { precision: "dia" | "mes"; fecha: string } | null {
+  const t = texto.trim().toLowerCase();
+  let m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
+  if (m) return { precision: "dia", fecha: t };
+  m = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(t);
+  if (m) return { precision: "dia", fecha: `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}` };
+  m = /^(\d{1,2})[/-](\d{4})$/.exec(t);
+  if (m) return { precision: "mes", fecha: `${m[2]}-${m[1].padStart(2, "0")}-01` };
+  const mes = MESES.findIndex((n) => t.startsWith(n.toLowerCase()));
+  m = /(\d{4})/.exec(t);
+  if (mes >= 0 && m) return { precision: "mes", fecha: `${m[1]}-${String(mes + 1).padStart(2, "0")}-01` };
+  return null;
+}

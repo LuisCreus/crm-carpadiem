@@ -51,3 +51,17 @@ export function formatoFechaHora(valor: string | Date | null | undefined): strin
 export function codigoPresupuesto(numero: number): string {
   return `CD ${String(numero).padStart(3, "0")}`;
 }
+
+// Lee un importe escrito a la española: "1.500", "3.973,80", "13246 €" → número (null si no se entiende)
+export function leerEuros(texto: string): number | null {
+  let t = texto.replace(/[€\s]/g, "");
+  if (t.includes(",")) t = t.replace(/\./g, "").replace(",", ".");
+  else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, "");
+  if (!/^-?\d+(\.\d+)?$/.test(t)) return null;
+  return Number(t);
+}
+
+// Fecha de hoy (aaaa-mm-dd) en hora de Madrid, no en UTC
+export function hoyMadrid(ahora = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid" }).format(ahora);
+}

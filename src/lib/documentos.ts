@@ -6,6 +6,7 @@
 
 import { obtenerUsuario } from "@/lib/auth";
 import { crearClienteServidor } from "@/lib/supabase/server";
+import { crearClienteServicio } from "@/lib/supabase/servicio";
 import {
   ErrorSharePoint, TIPO_DOCX, TIPO_PDF, asegurarCarpeta, descargar, descargarComoPdf, elementoPorId,
   elementoPorRuta, moverRenombrar, rutaPlantilla, rutaReal, sharepointConfigurado, subir, urlDirecta,
@@ -106,7 +107,15 @@ async function subirWord(sb: Awaited<ReturnType<typeof crearClienteServidor>>, p
 }
 
 // "Crear Word": carpeta + .docx desde la plantilla (o desde otro presupuesto al duplicar)
-export async function crearDocumento(presupuestoId: string, origenId?: string): Promise<Resultado<{ webUrl: string; escritorio: string; nombre: string }>> {
+async function basePlantilla(p: PresupuestoDoc) {
+  const plantilla = await elementoPorRuta(rutaPlantilla(p.plantilla));
+  if (!plantilla) throw new Error(`No encuentro la plantilla del CRM (${rutaPlantilla(p.plantilla)})`);
+  return descargar(plantilla.id);
+}
+
+const AVISO_SIN_CAMPOS = "El Word original es anterior al CRM y no tiene campos automáticos: revisa a mano el cliente, la fecha, el lugar y el número de la cabecera.";
+
+export async function crearDocumento(presupuestoId: string, origenId?: string): Promise<Resultado<{ webUrl: string; escritorio: string; nombre: string; aviso?: string }>> {
   return capturar(async () => {
     const { sb, p } = await contexto(presupuestoId);
     const { data: version } = await sb.from("presupuesto_versiones").select("version, docx_item_id")
@@ -115,36 +124,59 @@ export async function crearDocumento(presupuestoId: string, origenId?: string): 
     if (version.docx_item_id) throw new Error("Este presupuesto ya tiene su Word");
 
     let base: Uint8Array;
+    let aviso: string | undefined;
     if (origenId) {
       const { data: v } = await sb.from("presupuesto_versiones").select("docx_item_id")
         .eq("presupuesto_id", origenId).not("docx_item_id", "is", null).order("version", { ascending: false }).limit(1).maybeSingle();
-      if (!v?.docx_item_id) throw new Error("El presupuesto original no tiene Word en SharePoint");
-      base = await descargar(v.docx_item_id);
+      if (v?.docx_item_id) base = await descargar(v.docx_item_id);
+      else {
+        base = await basePlantilla(p);
+        aviso = "El presupuesto original no tiene Word (solo PDF): he partido de la plantilla. Copia las partidas desde su PDF.";
+      }
     } else {
-      const plantilla = await elementoPorRuta(rutaPlantilla(p.plantilla));
-      if (!plantilla) throw new Error(`No encuentro la plantilla del CRM (${rutaPlantilla(p.plantilla)})`);
-      base = await descargar(plantilla.id);
+      base = await basePlantilla(p);
     }
 
-    const { docx } = await rellenarControles(base, valoresControles(p));
+    const { docx, etiquetas } = await rellenarControles(base, valoresControles(p));
+    if (!etiquetas.length) aviso = AVISO_SIN_CAMPOS;
     const { ruta } = await asegurarCarpetaPresupuesto(sb, p);
-    return { ok: true, ...(await subirWord(sb, p, ruta, version.version, docx)) };
+    return { ok: true, aviso, ...(await subirWord(sb, p, ruta, version.version, docx)) };
   });
 }
 
 // "Crear V02": copia el último Word como versión nueva
-export async function crearVersionDocumento(presupuestoId: string): Promise<Resultado<{ version: number; webUrl: string; escritorio: string }>> {
+export async function crearVersionDocumento(presupuestoId: string): Promise<Resultado<{ version: number; webUrl: string; escritorio: string; aviso?: string }>> {
   return capturar(async () => {
     const { sb, p } = await contexto(presupuestoId);
     const { data: ultima } = await sb.from("presupuesto_versiones").select("version, docx_item_id")
       .eq("presupuesto_id", p.id).not("docx_item_id", "is", null).order("version", { ascending: false }).limit(1).maybeSingle();
-    if (!ultima?.docx_item_id) throw new Error("Primero hay que crear el Word");
-    const base = await descargar(ultima.docx_item_id);
+    let base: Uint8Array;
+    let aviso: string | undefined;
+    if (ultima?.docx_item_id) base = await descargar(ultima.docx_item_id);
+    else {
+      const { docx, etiquetas } = await rellenarControles(await basePlantilla(p), valoresControles(p));
+      base = docx;
+      if (etiquetas.length) aviso = "No había Word de la versión anterior: he partido de la plantilla. Copia las partidas desde el PDF anterior.";
+    }
+
+    // Antes de crear la versión, comprobar que el nombre está libre (si falla no queda una versión vacía)
+    const { ruta } = await asegurarCarpetaPresupuesto(sb, p);
+    const { data: max } = await sb.from("presupuesto_versiones").select("version")
+      .eq("presupuesto_id", p.id).order("version", { ascending: false }).limit(1).single();
+    const siguiente = (max?.version ?? 0) + 1;
+    const nombre = nombreArchivoPresupuesto(p.numero, nombreCliente(p), siguiente, "docx");
+    if (await elementoPorRuta(`${ruta}/${nombre}`)) throw new Error(`Ya existe "${nombre}" en la carpeta. No lo sustituyo para no perder cambios.`);
+
     const { data: nueva, error } = await sb.rpc("nueva_version", { p_id: p.id });
     if (error) throw new Error(error.message);
-    const { ruta } = await asegurarCarpetaPresupuesto(sb, p);
-    const subido = await subirWord(sb, p, ruta, nueva as number, base);
-    return { ok: true, version: nueva as number, webUrl: subido.webUrl, escritorio: subido.escritorio };
+    try {
+      const subido = await subirWord(sb, p, ruta, nueva as number, base);
+      return { ok: true, aviso, version: nueva as number, webUrl: subido.webUrl, escritorio: subido.escritorio };
+    } catch (e) {
+      // Borrar la versión vacía (borrar definitivamente solo lo puede el administrador: se hace como el CRM)
+      await crearClienteServicio().from("presupuesto_versiones").delete().eq("presupuesto_id", p.id).eq("version", nueva as number);
+      throw e;
+    }
   });
 }
 
@@ -180,7 +212,8 @@ export async function moverCarpeta(presupuestoId: string): Promise<Resultado<{ r
     const { sb, p } = await contexto(presupuestoId);
     if (!p.sp_carpeta_id) throw new Error("Este presupuesto no tiene carpeta todavía");
     const nueva = rutaReal(rutaCarpetaCliente(p.fecha_precision, p.fecha_evento, nombreCliente(p)));
-    if (await elementoPorRuta(nueva)) throw new Error(`Ya existe una carpeta "${nueva}". Muévela a mano o dime cómo seguir.`);
+    const existente = await elementoPorRuta(nueva);
+    if (existente && existente.id !== p.sp_carpeta_id) throw new Error(`Ya existe una carpeta "${nueva}". Muévela a mano o dime cómo seguir.`);
     const partes = nueva.split("/");
     const nombre = partes.pop()!;
     const movida = await moverRenombrar(p.sp_carpeta_id, partes.join("/"), nombre);
@@ -217,9 +250,9 @@ export async function guardarHojaMontaje(eventoId: string): Promise<Resultado<{ 
     const sb = await crearClienteServidor();
     const datos = await cargarDatosHoja(sb, eventoId);
     if (!datos) throw new Error("Evento no encontrado");
-    const ruta = datos.carpetaRuta
-      ?? rutaReal(rutaCarpetaCliente(datos.fechaPrecision, datos.fechaInicio, datos.cliente));
-    await asegurarCarpeta(ruta);
+    // Solo se guarda en la carpeta que ya tiene el presupuesto: no se crean carpetas nuevas
+    const ruta = datos.carpetaRuta;
+    if (!ruta) throw new Error("Este evento no tiene carpeta enlazada en SharePoint. Usa “Descargar” o “Compartir”.");
     const nombre = nombreArchivoHoja(datos);
     const item = await subir(`${ruta}/${nombre}`, await generarPdfHoja(datos), TIPO_PDF);
     const { error } = await sb.from("eventos").update({ hoja_montaje_url: item.webUrl, hoja_montaje_item_id: item.id }).eq("id", eventoId);

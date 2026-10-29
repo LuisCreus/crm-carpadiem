@@ -46,6 +46,7 @@ export type Presupuesto = PresupuestoLista & {
   motivo_rechazo: string | null;
   enviado_at: string | null;
   version_enviada: number | null;
+  carpeta_importada: boolean;
   sp_carpeta_url: string | null;
   sp_carpeta_ruta: string | null;
   intermediario: { id: string; nombre: string } | null;

@@ -122,6 +122,8 @@ describe("números del Inicio", () => {
 
   it("reservas cobradas frente a pendientes", () => {
     expect(reservas([p("aceptado", null, 10000, 30, 1000), p("reserva_pagada", null, 1000, 30, 300)]))
-      .toEqual({ cobradas: 1300, pendientes: 2000 });
+      .toEqual({ cobradas: 1300, pendientes: 2000, sinDatos: 0 });
+    expect(reservas([{ ...p("pagado", null, 4000, 0, 4000), reserva_pct: null }]))
+      .toEqual({ cobradas: 0, pendientes: 0, sinDatos: 1 });
   });
 });

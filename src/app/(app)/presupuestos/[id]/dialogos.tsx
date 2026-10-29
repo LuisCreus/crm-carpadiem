@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useListas } from "@/hooks/use-listas";
 import { crearClienteNavegador } from "@/lib/supabase/client";
 import { CONCEPTOS_COBRO, type Presupuesto } from "@/lib/datos/tipos";
-import { formatoEuros } from "@/lib/formato";
+import { formatoEuros, hoyMadrid, leerEuros } from "@/lib/formato";
 import type { PrecisionFecha } from "@/lib/negocio";
 import { cn } from "@/lib/utils";
 
@@ -91,7 +91,7 @@ export function DialogoRechazar({ abierto, cerrar, presupuesto }: Abierto & { pr
 export function DialogoCobro({ abierto, cerrar, presupuestoId, pendiente, reservaPendiente }: Abierto & {
   presupuestoId: string; pendiente: number | null; reservaPendiente: number | null;
 }) {
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = hoyMadrid();
   const [fecha, setFecha] = useState(hoy);
   const [importe, setImporte] = useState("");
   const [concepto, setConcepto] = useState<keyof typeof CONCEPTOS_COBRO>(reservaPendiente ? "reserva" : "resto");
@@ -99,8 +99,8 @@ export function DialogoCobro({ abierto, cerrar, presupuestoId, pendiente, reserv
 
   async function guardar(e: FormEvent) {
     e.preventDefault();
-    const valor = Number(importe.replace(",", "."));
-    if (!(valor > 0)) return toast.error("Escribe el importe cobrado");
+    const valor = leerEuros(importe);
+    if (valor === null || !(valor > 0)) return toast.error("Escribe el importe cobrado, por ejemplo 1.500 o 3.973,80");
     const { error } = await crearClienteNavegador().from("cobros")
       .insert({ presupuesto_id: presupuestoId, fecha, importe: valor, concepto, notas: notas.trim() || null });
     if (error) return toast.error(error.message);
@@ -161,6 +161,7 @@ export function DialogoDatos({ abierto, cerrar, presupuesto }: Abierto & { presu
   const [fechaFin, setFechaFin] = useState(p.fecha_fin ?? "");
   const [campos, setCampos] = useState({
     cliente: p.cliente?.nombre ?? "",
+    tipo_cliente: p.cliente?.tipo_cliente ?? "",
     tipo_evento: p.tipo_evento ?? "",
     ubicacion: p.ubicacion ?? "",
     provincia: p.provincia ?? "",
@@ -193,9 +194,14 @@ export function DialogoDatos({ abierto, cerrar, presupuesto }: Abierto & { presu
       plantilla: campos.plantilla,
     }).eq("id", p.id);
     if (error) return toast.error(error.message);
-    if (p.cliente && campos.cliente.trim() && campos.cliente.trim() !== p.cliente.nombre) {
-      const r = await sb.from("clientes").update({ nombre: campos.cliente.trim() }).eq("id", p.cliente.id);
-      if (r.error) return toast.error(r.error.message);
+    if (p.cliente) {
+      const cambios: Record<string, string> = {};
+      if (campos.cliente.trim() && campos.cliente.trim() !== p.cliente.nombre) cambios.nombre = campos.cliente.trim();
+      if (campos.tipo_cliente && campos.tipo_cliente !== p.cliente.tipo_cliente) cambios.tipo_cliente = campos.tipo_cliente;
+      if (Object.keys(cambios).length) {
+        const r = await sb.from("clientes").update(cambios).eq("id", p.cliente.id);
+        if (r.error) return toast.error(r.error.message);
+      }
     }
     toast.success("Guardado ✓");
     cerrar();
@@ -206,14 +212,21 @@ export function DialogoDatos({ abierto, cerrar, presupuesto }: Abierto & { presu
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Editar datos de {p.codigo}</DialogTitle>
-          <DialogDescription>Si cambian la fecha o el cliente, en la Fase 4 el CRM propondrá mover o renombrar la carpeta.</DialogDescription>
+          <DialogDescription>Si cambian la fecha o el cliente, el CRM te propondrá mover o renombrar la carpeta. Los cambios pasan también al evento.</DialogDescription>
         </DialogHeader>
         <form id="form-datos" onSubmit={guardar} className="grid gap-4 sm:grid-cols-2">
           <Campo id="d-cliente" etiqueta="Cliente" className="sm:col-span-2">
             <Input id="d-cliente" value={campos.cliente} onChange={(e) => set("cliente", e.target.value)} />
           </Campo>
+          <Campo id="d-tipo-cliente" etiqueta="Tipo de cliente">
+            <select id="d-tipo-cliente" className={claseSelect} value={campos.tipo_cliente} onChange={(e) => set("tipo_cliente", e.target.value)}>
+              {!campos.tipo_cliente && <option value="">—</option>}
+              {listas.tiposCliente.map((t) => <option key={t.codigo} value={t.codigo}>{t.nombre}</option>)}
+            </select>
+          </Campo>
           <Campo id="d-tipo" etiqueta="Tipo de evento">
             <select id="d-tipo" className={claseSelect} value={campos.tipo_evento} onChange={(e) => set("tipo_evento", e.target.value)}>
+              <option value="">—</option>
               {listas.tiposEvento.map((t) => <option key={t.codigo} value={t.codigo}>{t.nombre}</option>)}
             </select>
           </Campo>

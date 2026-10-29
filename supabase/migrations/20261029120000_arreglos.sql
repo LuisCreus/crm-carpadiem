@@ -50,3 +50,55 @@ begin
   return v_evento;
 end;
 $$;
+
+-- ---------------------------------------------------------------------
+-- El presupuesto y su evento comparten fecha, lugar, material, tipo e intermediario:
+-- si se cambia en uno, se copia al otro (el "is distinct from" evita el bucle)
+-- ---------------------------------------------------------------------
+create function public.sincronizar_evento() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  update public.eventos e set
+    fecha_precision = new.fecha_precision, fecha_inicio = new.fecha_evento, fecha_fin = new.fecha_fin,
+    ubicacion = new.ubicacion, provincia = new.provincia, material = new.material,
+    tipo_evento = new.tipo_evento, intermediario_id = new.intermediario_id
+  where e.presupuesto_id = new.id
+    and (e.fecha_precision, e.fecha_inicio, e.fecha_fin, e.ubicacion, e.provincia, e.material, e.tipo_evento, e.intermediario_id)
+        is distinct from
+        (new.fecha_precision, new.fecha_evento, new.fecha_fin, new.ubicacion, new.provincia, new.material, new.tipo_evento, new.intermediario_id);
+  return null;
+end;
+$$;
+create trigger sincronizar_evento
+after update of fecha_precision, fecha_evento, fecha_fin, ubicacion, provincia, material, tipo_evento, intermediario_id
+on public.presupuestos for each row execute function public.sincronizar_evento();
+
+create function public.sincronizar_presupuesto() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if new.presupuesto_id is null then
+    return null;
+  end if;
+  update public.presupuestos p set
+    fecha_precision = new.fecha_precision, fecha_evento = new.fecha_inicio, fecha_fin = new.fecha_fin,
+    ubicacion = new.ubicacion, provincia = new.provincia, material = new.material,
+    tipo_evento = new.tipo_evento, intermediario_id = new.intermediario_id
+  where p.id = new.presupuesto_id
+    and (p.fecha_precision, p.fecha_evento, p.fecha_fin, p.ubicacion, p.provincia, p.material, p.tipo_evento, p.intermediario_id)
+        is distinct from
+        (new.fecha_precision, new.fecha_inicio, new.fecha_fin, new.ubicacion, new.provincia, new.material, new.tipo_evento, new.intermediario_id);
+  return null;
+end;
+$$;
+create trigger sincronizar_presupuesto
+after update of fecha_precision, fecha_inicio, fecha_fin, ubicacion, provincia, material, tipo_evento, intermediario_id
+on public.eventos for each row execute function public.sincronizar_presupuesto();
+
+revoke execute on function public.sincronizar_evento(), public.sincronizar_presupuesto() from public, anon;
+
+-- ---------------------------------------------------------------------
+-- Carpetas enlazadas en la importación: se respetan tal cual (no se proponen mover ni renombrar)
+-- ---------------------------------------------------------------------
+alter table public.presupuestos add column carpeta_importada boolean not null default false;
+update public.presupuestos set carpeta_importada = true
+ where sp_carpeta_id is not null and anio = 2026 and numero <= 77;

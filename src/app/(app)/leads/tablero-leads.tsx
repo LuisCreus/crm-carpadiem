@@ -18,7 +18,7 @@ import { nombreDe, useListas } from "@/hooks/use-listas";
 import { crearClienteNavegador } from "@/lib/supabase/client";
 import { moverAPapelera } from "@/lib/datos/papelera";
 import { uno } from "@/lib/datos/tipos";
-import { formatoFecha } from "@/lib/formato";
+import { formatoFecha, hoyMadrid } from "@/lib/formato";
 import { cn } from "@/lib/utils";
 
 type EstadoLead = "por_contactar" | "contactado" | "interesado" | "presupuesto_enviado" | "ganado" | "perdido";
@@ -56,7 +56,7 @@ type Lead = {
 
 type Borrador = Omit<Lead, "id" | "orden_kanban" | "comercial"> & { id?: string };
 
-const hoy = () => new Date().toISOString().slice(0, 10);
+const hoy = () => hoyMadrid();
 
 export function TableroLeads({ nombreUsuario }: { nombreUsuario: string }) {
   const listas = useListas();

@@ -12,7 +12,7 @@ import {
   crearDocumento, crearVersionDocumento, enlaceEscritorio, estadoSharePoint, generarPdf, moverCarpeta,
 } from "@/lib/documentos";
 import type { Presupuesto, Version } from "@/lib/datos/tipos";
-import { formatoEuros, formatoFecha, formatoPorcentaje } from "@/lib/formato";
+import { formatoEuros, formatoFecha, formatoPorcentaje, leerEuros } from "@/lib/formato";
 import { importeReserva, nombreArchivoPresupuesto, rutaCarpetaCliente } from "@/lib/negocio";
 
 const vv = (n: number) => `V${String(n).padStart(2, "0")}`;
@@ -36,7 +36,10 @@ export function TarjetaDocumento({ p, versiones }: { p: Presupuesto; versiones: 
   const ultima = versiones[0];
   const conWord = versiones.find((v) => v.docx_item_id);
   const carpetaEsperada = rutaCarpetaCliente(p.fecha_precision, p.fecha_evento, cliente).replace(/^CARPA DIEM\//, "");
-  const carpetaDesfasada = p.sp_carpeta_ruta && !p.sp_carpeta_ruta.endsWith(carpetaEsperada);
+  // Las carpetas enlazadas al importar el Excel se respetan tal cual
+  const carpetaDesfasada = !p.carpeta_importada && p.sp_carpeta_ruta && !p.sp_carpeta_ruta.endsWith(carpetaEsperada);
+
+  const tienePdf = (v: Version) => Boolean(v.pdf_item_id || v.pdf_storage);
 
   async function ejecutar<T>(clave: string, fn: () => Promise<T>) {
     setOcupado(clave);
@@ -56,22 +59,29 @@ export function TarjetaDocumento({ p, versiones }: { p: Presupuesto; versiones: 
     const r = await ejecutar("crear", () => crearDocumento(p.id));
     if (!r.ok) return toast.error(r.error);
     toast.success(`${r.nombre} creado ✓`);
+    if (r.aviso) toast.warning(r.aviso, { duration: 15000 });
     window.location.href = r.escritorio;
   }
 
   async function nuevaVersion() {
-    if (!sp?.configurado || !conWord) {
+    if (!sp?.configurado) {
       const { data, error } = await sb.rpc("nueva_version", { p_id: p.id });
       return error ? toast.error(error.message) : toast.success(`${vv(data as number)} creada ✓`);
     }
     const r = await ejecutar("version", () => crearVersionDocumento(p.id));
     if (!r.ok) return toast.error(r.error);
     toast.success(`${vv(r.version)} creada ✓ · abriendo Word…`);
+    if (r.aviso) toast.warning(r.aviso, { duration: 15000 });
     window.location.href = r.escritorio;
   }
 
   async function pdf(forzar = false) {
     setEsperarWord(false);
+    // Una versión ya enviada no se rehace: los cambios van en una versión nueva
+    if (!forzar && ultima && ultima.version === p.version_enviada && tienePdf(ultima)
+      && !window.confirm(`${vv(ultima.version)} ya se envió al cliente. Si has cambiado algo, lo correcto es “Crear ${vv(ultima.version + 1)}”.
+
+¿Rehacer igualmente el PDF de ${vv(ultima.version)}?`)) return;
     const r = await ejecutar("pdf", () => generarPdf(p.id, forzar));
     if (!r.ok) return toast.error(r.error);
     if (r.esperar) return setEsperarWord(true);
@@ -134,7 +144,6 @@ export function TarjetaDocumento({ p, versiones }: { p: Presupuesto; versiones: 
     }
   }
 
-  const tienePdf = (v: Version) => Boolean(v.pdf_item_id || v.pdf_storage);
   // Los importados conservan el nombre que ya tenían en SharePoint
   const nombreUltima = ultima?.nombre_archivo?.replace(/\.(docx|pdf)$/i, "")
     ?? nombreArchivoPresupuesto(p.numero, cliente, ultima?.version ?? 1, "docx").replace(/\.docx$/, "");
@@ -170,7 +179,7 @@ export function TarjetaDocumento({ p, versiones }: { p: Presupuesto; versiones: 
       </div>
 
       <div className="mt-3.5 flex flex-wrap gap-2">
-        {sp?.configurado && !ultima?.docx_item_id && !conWord && (
+        {sp?.configurado && !ultima?.docx_item_id && !conWord && !(ultima && tienePdf(ultima)) && (
           <Button disabled={ocupado !== null} onClick={crearWord}>{ocupado === "crear" ? "Creando Word…" : "Crear Word"}</Button>
         )}
         {ultima?.docx_item_id && (
@@ -253,8 +262,8 @@ export function TarjetaDocumento({ p, versiones }: { p: Presupuesto; versiones: 
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmar(null)}>Ahora no</Button>
             <Button onClick={() => {
-              const total = Number(importeTexto.replace(/\./g, "").replace(",", "."));
-              if (!(total >= 0) || !confirmar) return toast.error("Importe no válido");
+              const total = leerEuros(importeTexto);
+              if (total === null || total < 0 || !confirmar) return toast.error("Importe no válido");
               void guardarImporte(total, confirmar.reservaPct, confirmar.version);
             }}>Sí, guardar</Button>
           </DialogFooter>

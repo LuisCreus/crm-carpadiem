@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { codigoPresupuesto, formatoEuros, formatoFecha, formatoPorcentaje } from "../formato";
+import { codigoPresupuesto, formatoEuros, formatoFecha, formatoPorcentaje, hoyMadrid, leerEuros } from "../formato";
 
 describe("formato", () => {
   it("importes con punto de miles y € al final", () => {
@@ -22,5 +22,23 @@ describe("formato", () => {
     expect(codigoPresupuesto(78)).toBe("CD 078");
     expect(codigoPresupuesto(13)).toBe("CD 013");
     expect(codigoPresupuesto(1234)).toBe("CD 1234");
+  });
+});
+
+describe("leerEuros", () => {
+  it("entiende los importes escritos a la española", () => {
+    expect(leerEuros("1.500")).toBe(1500);
+    expect(leerEuros("3.973,80")).toBe(3973.8);
+    expect(leerEuros("13246 €")).toBe(13246);
+    expect(leerEuros("250,5")).toBe(250.5);
+    expect(leerEuros("12.5")).toBe(12.5);
+    expect(leerEuros("abc")).toBeNull();
+  });
+});
+
+describe("hoyMadrid", () => {
+  it("usa la hora de Madrid: a las 00:30 de Madrid ya es el día siguiente", () => {
+    expect(hoyMadrid(new Date("2026-10-28T23:30:00Z"))).toBe("2026-10-29"); // 00:30 en Madrid (invierno)
+    expect(hoyMadrid(new Date("2026-07-14T22:30:00Z"))).toBe("2026-07-15"); // 00:30 en Madrid (verano)
   });
 });

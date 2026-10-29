@@ -11,7 +11,7 @@ import { textoCobro, useEventos } from "@/hooks/use-eventos";
 import { nombreDe, useListas } from "@/hooks/use-listas";
 import { useTablaEnVivo } from "@/hooks/use-tabla-en-vivo";
 import { uno } from "@/lib/datos/tipos";
-import { formatoEuros } from "@/lib/formato";
+import { formatoEuros, hoyMadrid } from "@/lib/formato";
 import { MESES, type PrecisionFecha } from "@/lib/negocio";
 import {
   diasCalendario, empiezaEnMes, estaEnMes, mesesDelPeriodo, ordenEnMes, textoDias,
@@ -43,7 +43,7 @@ const mayus = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export function Planificacion({ mesDetalle }: { mesDetalle?: string }) {
   const listas = useListas();
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = hoyMadrid();
   const [periodo, setPeriodo] = useState<number | "proximos">(Number(hoy.slice(0, 4)));
   const [verPendientes, setVerPendientes] = useState(false);
   const [abiertos, setAbiertos] = useState<Set<string>>(() => new Set([hoy.slice(0, 7)]));
@@ -82,6 +82,8 @@ export function Planificacion({ mesDetalle }: { mesDetalle?: string }) {
       total: cerrados.filter((t) => empiezaEnMes(t, m)).reduce((s, t) => s + (t.importe ?? 0), 0),
     };
   });
+  // Eventos cerrados sin fecha: no caben en ningún mes, pero no se pueden perder de vista
+  const sinFecha = tarjetas.filter((t) => t.clase !== "pendiente" && (t.fecha_precision === "por_definir" || !t.inicio));
   const totalN = meses.reduce((s, m) => s + m.n, 0);
   const totalImporte = meses.reduce((s, m) => s + m.total, 0);
 
@@ -113,6 +115,21 @@ export function Planificacion({ mesDetalle }: { mesDetalle?: string }) {
         <span><Etiqueta className={CLASE_SEGURO}>Seguro</Etiqueta> seguro de lluvia</span>
         <span><Etiqueta className="border border-dashed border-[#BDBBB5] bg-card">Pendiente</Etiqueta> presupuesto sin aceptar</span>
       </div>
+
+      {sinFecha.length > 0 && (
+        <section aria-label="Eventos sin fecha" className="mb-4 rounded-xl border border-dashed bg-card p-3.5">
+          <div className="mb-2 text-sm font-semibold">Sin fecha <span className="font-normal text-muted-foreground">· pon la fecha en el evento para que salga en su mes</span></div>
+          <ul className="flex flex-wrap gap-2">
+            {sinFecha.map((t) => (
+              <li key={t.id}>
+                <Link href={t.href} className="inline-flex rounded-lg border bg-background px-3 py-1.5 text-sm hover:bg-muted">
+                  {t.cliente}{t.material && <span className="ml-1.5 text-muted-foreground">· {t.material}</span>}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* Ordenador: cuadrícula de 12 meses */}
       <div className="hidden grid-cols-2 gap-3.5 md:grid xl:grid-cols-4">
@@ -217,7 +234,7 @@ function DetalleMes({ clave, tarjetas, verPendientes, setVerPendientes }: {
   const anterior = mes === 1 ? `${anio - 1}-12` : `${anio}-${String(mes - 1).padStart(2, "0")}`;
   const siguiente = mes === 12 ? `${anio + 1}-01` : `${anio}-${String(mes + 1).padStart(2, "0")}`;
   const sinDia = delMes.filter((t) => t.fecha_precision !== "dia" && estaEnMes(t, m));
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = hoyMadrid();
   const [vista, setVista] = useState<"mes" | "semana">("mes");
   const semanaHoy = semanas.findIndex((s) => s.includes(hoy));
   const [semana, setSemana] = useState(semanaHoy >= 0 ? semanaHoy : 0);
