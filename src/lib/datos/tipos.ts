@@ -145,10 +145,13 @@ export type Factura = DatosFacturacion & {
   fecha_pago: string | null;
   automatica: boolean;
   comentarios: string | null;
+  pdf_item_id: string | null;
+  pdf_url: string | null;
+  pdf_nombre: string | null;
 };
 
 export const SELECT_FACTURA =
-  "id, evento_id, cliente_id, tipo, concepto, descripcion, importe, iva_pct, suplidos, estado, anio, numero, codigo, fecha_emision, fecha_pago, automatica, comentarios, fact_nombre, fact_nif, fact_domicilio, fact_cp_ciudad, fact_email";
+  "id, evento_id, cliente_id, tipo, concepto, descripcion, importe, iva_pct, suplidos, estado, anio, numero, codigo, fecha_emision, fecha_pago, automatica, comentarios, fact_nombre, fact_nif, fact_domicilio, fact_cp_ciudad, fact_email, pdf_item_id, pdf_url, pdf_nombre";
 
 // Los numeric llegan como texto: se pasan a número
 export function aFactura(f: Record<string, unknown>): Factura {

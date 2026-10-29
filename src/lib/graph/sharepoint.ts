@@ -201,3 +201,14 @@ export const TIPO_XLSX = "application/vnd.openxmlformats-officedocument.spreadsh
 export function rutaCopias(): string {
   return (process.env.SP_COPIAS ?? "CARPA DIEM/00. CRM PRUEBAS/COPIAS DE SEGURIDAD").replace(/\/+$/, "");
 }
+
+// Sustituye el contenido de un archivo que ya existe (aunque lo hayan movido de carpeta)
+export async function reemplazarContenido(id: string, contenido: Uint8Array, tipo: string): Promise<Elemento> {
+  const drive = await obtenerDrive();
+  const r = await graph(`/drives/${drive}/items/${id}/content`, {
+    method: "PUT",
+    headers: { "Content-Type": tipo },
+    body: contenido as unknown as BodyInit,
+  });
+  return (await r.json()) as Elemento;
+}

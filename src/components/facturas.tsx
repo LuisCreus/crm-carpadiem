@@ -4,6 +4,7 @@
 
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
+import { Download, Share2 } from "lucide-react";
 import { Campo, claseSelect } from "@/components/campo";
 import { Etiqueta } from "@/components/etiqueta-estado";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import { moverAPapelera } from "@/lib/datos/papelera";
 import type { DatosFacturacion, Factura, TipoFactura } from "@/lib/datos/tipos";
 import { ESTADOS_FACTURA, TIPOS_FACTURA, totalFactura } from "@/lib/facturacion";
 import { formatoEuros, formatoFecha, hoyMadrid, leerEuros } from "@/lib/formato";
+import { generarPdfFactura } from "@/lib/facturas-pdf";
 
 export function EtiquetaFactura({ f }: { f: Pick<Factura, "estado"> }) {
   const e = ESTADOS_FACTURA[f.estado];
@@ -177,10 +179,38 @@ export function AccionesFactura({ f, datos, editar }: { f: Factura; datos: Datos
   async function emitir() {
     setOcupado(true);
     const { data, error } = await sb.rpc("emitir_factura", { p_id: f.id });
-    setOcupado(false);
-    if (error) return toast.error(error.message);
-    toast.success(`Factura ${data as string} emitida ✓`, { duration: 10000 });
+    if (error) {
+      setOcupado(false);
+      return toast.error(error.message);
+    }
     setDialogo(null);
+    const id = toast.loading(`Factura ${data as string} emitida ✓ · generando el PDF…`);
+    const r = await generarPdfFactura(f.id);
+    setOcupado(false);
+    if (r.ok) toast.success(`${r.nombre} guardada en PENDIENTE SARA ✓`, { id, duration: 8000 });
+    else toast.error(`Factura ${data as string} emitida, pero el PDF no: ${r.error}. Pulsa “Generar PDF”.`, { id, duration: 15000 });
+  }
+
+  async function pdf() {
+    setOcupado(true);
+    const id = toast.loading("Generando el PDF…");
+    const r = await generarPdfFactura(f.id);
+    setOcupado(false);
+    if (r.ok) toast.success(`${r.nombre} guardada ✓`, { id });
+    else toast.error(r.error, { id, duration: 15000 });
+  }
+
+  async function compartir() {
+    try {
+      const resp = await fetch(`/api/factura/${f.id}`);
+      if (!resp.ok) throw new Error("No se pudo descargar el PDF");
+      const nombre = f.pdf_nombre ?? `FACTURA ${f.codigo}.pdf`;
+      const archivo = new File([await resp.blob()], nombre, { type: "application/pdf" });
+      if (navigator.canShare?.({ files: [archivo] })) await navigator.share({ files: [archivo], title: nombre });
+      else window.open(`/api/factura/${f.id}?ver=1`, "_blank");
+    } catch (e) {
+      if (e instanceof Error && e.name !== "AbortError") toast.error(e.message);
+    }
   }
 
   async function pagar() {
@@ -218,6 +248,18 @@ export function AccionesFactura({ f, datos, editar }: { f: Factura; datos: Datos
           <Button size="sm" variant="ghost" onClick={quitar}>Quitar</Button>
         </>
       )}
+      {f.estado !== "prevista" && (f.pdf_item_id ? (
+        <>
+          <Button size="icon-sm" variant="ghost" aria-label={`Descargar PDF de ${f.codigo}`} render={<a href={`/api/factura/${f.id}`} />}>
+            <Download className="size-3.5" aria-hidden />
+          </Button>
+          <Button size="icon-sm" variant="ghost" aria-label={`Compartir PDF de ${f.codigo}`} onClick={compartir}>
+            <Share2 className="size-3.5" aria-hidden />
+          </Button>
+        </>
+      ) : (
+        <Button size="sm" variant="ghost" disabled={ocupado} onClick={pdf}>Generar PDF</Button>
+      ))}
       {f.estado === "emitida" && <Button size="sm" variant="outline" onClick={() => setDialogo("pagar")}>Marcar pagada</Button>}
       {f.estado === "pagada" && <Button size="sm" variant="ghost" onClick={deshacerPago}>Deshacer pago</Button>}
 
@@ -238,7 +280,7 @@ export function AccionesFactura({ f, datos, editar }: { f: Factura; datos: Datos
                 <span className="font-semibold text-foreground">Total</span><span className="text-right font-semibold text-foreground">{formatoEuros(total)}</span>
               </div>
             </div>
-            <p className="text-[13px] text-muted-foreground">Hasta que el CRM genere el PDF (Fase 12), haz la factura en el Excel con el número que te dé el CRM.</p>
+            <p className="text-[13px] text-muted-foreground">El CRM hace el PDF con la plantilla de la hoja “Emitir” y lo guarda en 03. FINANCIERO/01. FACTURAS/01. PENDIENTE SARA/01. EMITIDAS.</p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogo(null)}>Cancelar</Button>

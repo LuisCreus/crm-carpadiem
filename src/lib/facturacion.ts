@@ -1,5 +1,6 @@
 // Cálculos de facturación (sin base de datos), para el evento, la lista de facturas y los avisos.
 import type { EstadoFactura, Factura, TipoFactura } from "@/lib/datos/tipos";
+import { limpiarNombre } from "@/lib/negocio";
 
 export const TIPOS_FACTURA: Record<TipoFactura, string> = {
   reserva: "Reserva",
@@ -40,4 +41,9 @@ export function resumenFacturacion(importeEvento: number | null, facturas: Factu
 const MESES = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
 export function conceptoMensualidad(fecha: string): string {
   return `Honorarios correspondientes a servicio de CARPAS en ${MESES[Number(fecha.slice(5, 7)) - 1]} de ${fecha.slice(0, 4)}`;
+}
+
+// "FACTURA CD 26 CARLOTA DURÁN.pdf", con el nombre de a quién se factura (como las de 01. PENDIENTE SARA)
+export function nombreArchivoFactura(numero: number, facturadoA: string): string {
+  return `FACTURA CD ${numero} ${limpiarNombre(facturadoA).toLocaleUpperCase("es-ES")}.pdf`;
 }
