@@ -170,8 +170,9 @@ export function DialogoFactura({ cerrar, factura, eventoId, clienteId, inicial }
 
 // Botones de una factura según su estado: Emitir · Marcar pagada · Deshacer pago · Editar · Quitar
 export function AccionesFactura({ f, datos, editar }: { f: Factura; datos: DatosFacturacion; editar?: () => void }) {
-  const [dialogo, setDialogo] = useState<"emitir" | "pagar" | null>(null);
+  const [dialogo, setDialogo] = useState<"emitir" | "pagar" | "datos" | null>(null);
   const [fechaPago, setFechaPago] = useState(hoyMadrid());
+  const faltanDatos = !datos.fact_nombre || !datos.fact_nif;
   const [ocupado, setOcupado] = useState(false);
   const sb = crearClienteNavegador();
   const { iva, total } = totalFactura(f);
@@ -270,7 +271,14 @@ export function AccionesFactura({ f, datos, editar }: { f: Factura; datos: Datos
             <DialogDescription>Recibe el siguiente número (CD {new Date().getFullYear()}/…) y ya no se puede borrar ni cambiar de importe.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 text-sm">
-            <TextoDatosFacturacion d={datos} />
+            <div className="flex items-start gap-3 rounded-lg border bg-background p-3">
+              <div className="min-w-0 flex-1"><TextoDatosFacturacion d={datos} /></div>
+              {f.cliente_id && (
+                <Button size="sm" variant={faltanDatos ? "default" : "ghost"} onClick={() => setDialogo("datos")}>
+                  {faltanDatos ? "Rellenar" : "Cambiar"}
+                </Button>
+              )}
+            </div>
             <div className="rounded-lg border bg-background p-3">
               <div>{f.concepto ?? TIPOS_FACTURA[f.tipo]}</div>
               <div className="mt-2 grid grid-cols-[1fr_auto] gap-x-4 text-muted-foreground">
@@ -284,10 +292,15 @@ export function AccionesFactura({ f, datos, editar }: { f: Factura; datos: Datos
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogo(null)}>Cancelar</Button>
-            <Button disabled={ocupado || !datos.fact_nombre} onClick={emitir}>{ocupado ? "Emitiendo…" : "Emitir"}</Button>
+            <Button disabled={ocupado || faltanDatos} onClick={emitir}>{ocupado ? "Emitiendo…" : "Emitir"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {dialogo === "datos" && f.cliente_id && (
+        <DialogoDatosFacturacion cerrar={() => setDialogo("emitir")} clienteId={f.cliente_id} eventoId={f.evento_id ?? undefined}
+          inicial={datos} inicialSoloEvento={Boolean((datos as { deOtro?: boolean }).deOtro)} />
+      )}
 
       <Dialog open={dialogo === "pagar"} onOpenChange={(a) => !a && setDialogo(null)}>
         <DialogContent>
