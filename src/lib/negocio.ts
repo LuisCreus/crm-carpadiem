@@ -2,7 +2,7 @@
 
 export type EstadoPresupuesto =
   | "borrador" | "pendiente" | "aceptado" | "reserva_pagada" | "pagado"
-  | "rechazado" | "caducado" | "descartada";
+  | "rechazado" | "caido" | "caducado" | "descartada";
 
 export type PrecisionFecha = "dia" | "mes" | "por_definir";
 
@@ -13,6 +13,7 @@ export const ESTADOS: Record<EstadoPresupuesto, { texto: string; clase: string }
   reserva_pagada: { texto: "Reserva pagada", clase: "bg-[#EEF4F7] text-[#2F5D70]" },
   pagado: { texto: "Pagado 100 %", clase: "bg-[#DDEFE3] text-[#1D5631]" },
   rechazado: { texto: "Rechazado", clase: "bg-[#FDEDEC] text-[#B0302A]" },
+  caido: { texto: "Caído", clase: "bg-[#FDEDEC] text-[#B0302A]" },
   caducado: { texto: "Caducado", clase: "bg-[#F2F1EE] text-[#6B6A66]" },
   descartada: { texto: "Descartada", clase: "bg-[#F2F1EE] text-[#6B6A66] line-through" },
 };
@@ -20,7 +21,7 @@ export const ESTADOS: Record<EstadoPresupuesto, { texto: string; clase: string }
 export const ESTADOS_ACEPTADOS: EstadoPresupuesto[] = ["aceptado", "reserva_pagada", "pagado"];
 
 // Estados que se pueden elegir a mano (aceptar y los de pago tienen su propio botón o se calculan)
-export const ESTADOS_MANUALES: EstadoPresupuesto[] = ["borrador", "pendiente", "rechazado", "caducado"];
+export const ESTADOS_MANUALES: EstadoPresupuesto[] = ["borrador", "pendiente", "rechazado", "caido", "caducado"];
 
 export const MESES = [
   "enero", "febrero", "marzo", "abril", "mayo", "junio",

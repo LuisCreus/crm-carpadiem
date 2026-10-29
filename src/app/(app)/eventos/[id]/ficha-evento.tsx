@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { MapPin, Phone } from "lucide-react";
 import { Campo, claseSelect } from "@/components/campo";
@@ -17,6 +18,7 @@ import { crearClienteNavegador } from "@/lib/supabase/client";
 import { SELECT_EVENTO, uno, type Contacto, type Evento } from "@/lib/datos/tipos";
 import { formatoEuros, formatoFecha, leerEuros } from "@/lib/formato";
 import { diaSemana, enlaceMaps, fechaLimiteSeguro, textoFechaEvento, type PrecisionFecha } from "@/lib/negocio";
+import { cn } from "@/lib/utils";
 import { rangoOcupacion, solapesMaterial, type EventoOcupacion, type Solape } from "@/lib/operativa";
 import { TarjetaMontaje } from "./montaje";
 import { TarjetaFacturacion } from "./facturacion";
@@ -51,6 +53,7 @@ function Tarjeta({ titulo, accion, children }: { titulo: string; accion?: ReactN
 export function FichaEvento({ id }: { id: string }) {
   const listas = useListas();
   const [editar, setEditar] = useState(false);
+  const [caido, setCaido] = useState(false);
   const { datos, cargando } = useTablaEnVivo<Datos>(
     ["eventos", "cobros", "contactos", "clientes", "presupuestos", "evento_montadores", "material_movimientos", "evento_material", "inventario"],
     async (sb) => {
@@ -99,6 +102,13 @@ export function FichaEvento({ id }: { id: string }) {
   const direccion = [e.ubicacion, e.provincia].filter(Boolean).join(", ");
   const limite = e.modalidad === "seguro" && e.fecha_precision === "dia" && e.fecha_inicio ? fechaLimiteSeguro(e.fecha_inicio, d.diasSeguro) : null;
 
+  async function reactivar() {
+    if (!window.confirm("¿Reactivar el evento? Vuelve a la Planificación y el presupuesto pasa a Aceptado.")) return;
+    const { error } = await sb.rpc("evento_reactivar", { p_evento: e.id });
+    if (error) toast.error(error.message);
+    else toast.success("Evento reactivado ✓");
+  }
+
   async function actualizar(cambios: Partial<Evento>, ok: string) {
     const { error } = await sb.from("eventos").update(cambios).eq("id", e.id);
     if (error) toast.error(error.message);
@@ -125,6 +135,9 @@ export function FichaEvento({ id }: { id: string }) {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => setEditar(true)}>Editar</Button>
+          {e.estado === "activo"
+            ? <Button variant="outline" onClick={() => setCaido(true)}>Se ha caído…</Button>
+            : <Button variant="outline" onClick={() => reactivar()}>Reactivar evento</Button>}
           <HistorialDialogo tabla="eventos" registroId={e.id} titulo={e.cliente?.nombre ?? "Evento"} />
         </div>
       </div>
@@ -137,8 +150,12 @@ export function FichaEvento({ id }: { id: string }) {
           </div>
           <Button variant="outline" className="bg-card" onClick={() => actualizar({ modalidad: "confirmado" }, "Pasa a Confirmado ✓")}>Sigue adelante</Button>
           <Button variant="outline" className="bg-card"
-            onClick={() => window.confirm(`¿El cliente cancela? Carpa Diem se queda lo pagado (${formatoEuros(cobrado)}).`) &&
-              actualizar({ estado: "cancelado_reserva_retenida", importe_retenido: cobrado }, "Cancelado – reserva retenida")}>
+            onClick={async () => {
+              if (!window.confirm(`¿El cliente cancela? Carpa Diem se queda lo pagado (${formatoEuros(cobrado)}) y el presupuesto pasa a “Caído”.`)) return;
+              const { error } = await sb.rpc("evento_caido", { p_evento: e.id, p_retener: true, p_motivo: "Canceló el seguro de lluvia" });
+              if (error) toast.error(error.message);
+              else toast.success("Cancelado – reserva retenida");
+            }}>
             Cancela
           </Button>
         </div>
@@ -203,7 +220,74 @@ export function FichaEvento({ id }: { id: string }) {
       </div>
 
       {editar && <DialogoEditarEvento evento={e} cerrar={() => setEditar(false)} />}
+      {caido && <DialogoCaido evento={e} cobrado={cobrado} cerrar={() => setCaido(false)} />}
     </>
+  );
+}
+
+// El evento se cae (o se aceptó por error)
+function DialogoCaido({ evento: e, cobrado, cerrar }: { evento: Evento; cobrado: number; cerrar: () => void }) {
+  const router = useRouter();
+  const [opcion, setOpcion] = useState<"caido" | "error">("caido");
+  const [motivo, setMotivo] = useState("");
+  const [retener, setRetener] = useState(cobrado > 0);
+  const [ocupado, setOcupado] = useState(false);
+
+  async function confirmar() {
+    setOcupado(true);
+    const sb = crearClienteNavegador();
+    const { error } = opcion === "caido"
+      ? await sb.rpc("evento_caido", { p_evento: e.id, p_retener: retener, p_motivo: motivo.trim() || null })
+      : await sb.rpc("evento_por_error", { p_evento: e.id });
+    setOcupado(false);
+    if (error) return toast.error(error.message);
+    if (opcion === "caido") {
+      toast.success(retener && cobrado > 0 ? `Caído · nos quedamos ${formatoEuros(cobrado)}` : "Evento caído · sale de la Planificación");
+      cerrar();
+    } else {
+      toast.success("El presupuesto vuelve a Pendiente");
+      router.push(e.presupuesto ? `/presupuestos/${e.presupuesto.id}` : "/eventos");
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(a) => !a && cerrar()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>¿Qué ha pasado?</DialogTitle>
+          <DialogDescription>El evento sale de la Planificación y se quitan las facturas que estaban por emitir.</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-2">
+          {([
+            ["caido", "Se ha caído", "El cliente no sigue adelante. El presupuesto pasa a “Caído”."],
+            ["error", "Lo aceptamos por error", "El presupuesto vuelve a “Pendiente” y el evento desaparece."],
+          ] as const).map(([valor, titulo, texto]) => (
+            <button key={valor} type="button" aria-pressed={opcion === valor} onClick={() => setOpcion(valor)}
+              className={cn("rounded-lg border p-3 text-left", opcion === valor && "border-foreground ring-1 ring-foreground")}>
+              <div className="text-sm font-medium">{titulo}</div>
+              <div className="text-[13px] text-muted-foreground">{texto}</div>
+            </button>
+          ))}
+        </div>
+        {opcion === "caido" && (
+          <div className="grid gap-3">
+            <Campo id="caido-motivo" etiqueta="Motivo (opcional)">
+              <Textarea id="caido-motivo" rows={2} placeholder="Cambian de fecha, se casan en otro sitio…" value={motivo} onChange={(x) => setMotivo(x.target.value)} />
+            </Campo>
+            {cobrado > 0 && (
+              <label className="flex items-start gap-2 text-sm">
+                <input type="checkbox" className="mt-1" checked={retener} onChange={(x) => setRetener(x.target.checked)} />
+                <span>Carpa Diem se queda lo cobrado ({formatoEuros(cobrado)})</span>
+              </label>
+            )}
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={cerrar}>Cancelar</Button>
+          <Button disabled={ocupado} onClick={confirmar}>{opcion === "caido" ? "Marcar como caído" : "Volver a Pendiente"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

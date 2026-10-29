@@ -130,6 +130,40 @@ describe("enviar, aceptar y opciones", () => {
     expect(ev.rows[0]).toEqual({ fecha_inicio: "2027-06-19", ubicacion: "Finca Nueva" });
   });
 
+  it("evento caído: presupuesto Caído y evento cancelado; reactivar lo devuelve; con cobro se puede retener", async () => {
+    const p = await crear(BASE);
+    const ev = await como(() => db.query<{ e: string }>("select public.aceptar_presupuesto($1) e", [p.id]));
+    const eventoId = ev.rows[0].e;
+    const evento = async () => (await db.query<{ estado: string; importe_retenido: string | null }>(
+      "select estado, importe_retenido::text from public.eventos where id = $1", [eventoId])).rows[0];
+
+    await como(() => db.query("select public.evento_caido($1, false, 'Se casan en otra fecha')", [eventoId]));
+    expect(await estado(p.id)).toBe("caido");
+    expect((await evento()).estado).toBe("cancelado");
+
+    await como(() => db.query("select public.evento_reactivar($1)", [eventoId]));
+    expect(await estado(p.id)).toBe("aceptado");
+    expect((await evento()).estado).toBe("activo");
+
+    await cobrar(p.id, 1000);
+    await como(() => db.query("select public.evento_caido($1, true, null)", [eventoId]));
+    expect(await evento()).toEqual({ estado: "cancelado_reserva_retenida", importe_retenido: "1000.00" });
+    expect(await estado(p.id)).toBe("caido");
+  });
+
+  it("aceptado por error: vuelve a Pendiente y el evento desaparece", async () => {
+    const p = await crear(BASE);
+    const ev = await como(() => db.query<{ e: string }>("select public.aceptar_presupuesto($1) e", [p.id]));
+    await como(() => db.query("select public.evento_por_error($1)", [ev.rows[0].e]));
+    expect(await estado(p.id)).toBe("pendiente");
+    const r = await db.query("select 1 from public.eventos where presupuesto_id = $1 and deleted_at is null", [p.id]);
+    expect(r.rows).toHaveLength(0);
+    // Se puede volver a aceptar más tarde
+    await como(() => db.query("select public.aceptar_presupuesto($1)", [p.id]));
+    const r2 = await db.query("select estado from public.eventos where presupuesto_id = $1 and deleted_at is null", [p.id]);
+    expect(r2.rows).toEqual([{ estado: "activo" }]);
+  });
+
   it("aceptar marca el lead como Ganado", async () => {
     const lead = await como(async () => {
       const { rows } = await db.query<{ id: string }>(

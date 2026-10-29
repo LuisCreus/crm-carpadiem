@@ -202,7 +202,7 @@ export function FichaPresupuesto({ id }: { id: string }) {
             {textoFechaEvento(p.fecha_precision, p.fecha_evento, p.fecha_fin)}
             {(p.ubicacion || p.provincia) && ` · ${[p.ubicacion, p.provincia].filter(Boolean).join(", ")}`}
           </p>
-          {p.estado === "rechazado" && p.motivo_rechazo && (
+          {(p.estado === "rechazado" || p.estado === "caido") && p.motivo_rechazo && (
             <p className="mt-1 text-sm text-muted-foreground">Motivo: {p.motivo_rechazo}</p>
           )}
         </div>
