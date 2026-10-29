@@ -46,7 +46,7 @@ export function Inicio() {
         sb.from("cobros").select("presupuesto_id, importe").is("deleted_at", null),
         sb.from("leads").select("id, cliente_nombre, estado, proxima_accion_fecha, proxima_accion_texto").is("deleted_at", null),
         sb.from("ajustes").select("dias_seguimiento, dias_limite_seguro, dias_aviso_seguro, dias_aviso_resto, dias_aviso_cobro_factura").maybeSingle(),
-        sb.from("facturas").select("id, evento_id, tipo, estado, importe, codigo, fecha_emision").is("deleted_at", null).neq("estado", "pagada"),
+        sb.from("facturas").select("id, evento_id, tipo, estado, importe, codigo, fecha_emision, correo_preparado_at").is("deleted_at", null).neq("estado", "pagada"),
       ]);
       const cobrado = new Map<string, number>();
       for (const c of co.data ?? []) cobrado.set(c.presupuesto_id, (cobrado.get(c.presupuesto_id) ?? 0) + Number(c.importe));

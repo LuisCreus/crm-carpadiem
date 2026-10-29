@@ -112,6 +112,11 @@ describe("avisos de facturas", () => {
       .toEqual(["Factura del resto por emitir · 3.000 € · evento el 08/11/2026"]);
   });
 
+  it("emitida sin enviar al cliente", () => {
+    const sinEnviar = { ...fa("c", "resto", "emitida", "2026-11-01"), correo_preparado_at: null };
+    expect(avisos([ev("c", "2026-12-01")], [sinEnviar]).map((a) => a.detalle)).toEqual(["Emitida, falta enviarla al cliente"]);
+  });
+
   it("emitida sin cobrar a los 15 días", () => {
     expect(avisos([ev("c", "2026-12-01")], [fa("c", "reserva", "emitida", "2026-10-20")])).toHaveLength(0);
     expect(avisos([ev("c", "2026-12-01")], [fa("c", "reserva", "emitida", "2026-10-18")])[0].tipo).toBe("factura_cobro");

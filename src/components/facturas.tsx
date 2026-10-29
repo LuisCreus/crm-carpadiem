@@ -19,9 +19,13 @@ import { formatoEuros, formatoFecha, hoyMadrid, leerEuros } from "@/lib/formato"
 import { generarPdfFactura } from "@/lib/facturas-pdf";
 import { estadoCorreo, prepararCorreoFactura } from "@/lib/correo-facturas";
 
-export function EtiquetaFactura({ f }: { f: Pick<Factura, "estado"> }) {
+// Emitida y todavía sin enviar al cliente
+export const porEnviar = (f: Pick<Factura, "estado" | "correo_preparado_at">) => f.estado === "emitida" && !f.correo_preparado_at;
+
+export function EtiquetaFactura({ f }: { f: Pick<Factura, "estado" | "correo_preparado_at"> }) {
+  if (porEnviar(f)) return <Etiqueta className="bg-[#FDEDEC] text-[#B0302A]">Por enviar</Etiqueta>;
   const e = ESTADOS_FACTURA[f.estado];
-  return <Etiqueta className={e.clase}>{e.texto}</Etiqueta>;
+  return <Etiqueta className={e.clase}>{f.estado === "emitida" ? "Enviada" : e.texto}</Etiqueta>;
 }
 
 const CAMPOS_FISCALES: [keyof DatosFacturacion, string, string?][] = [
@@ -228,7 +232,10 @@ export function AccionesFactura({ f, datos, editar }: { f: Factura; datos: Datos
     const id = toast.loading(`Factura ${data as string} emitida ✓ · generando el PDF…`);
     const r = await generarPdfFactura(f.id);
     setOcupado(false);
-    if (r.ok) toast.success(`${r.nombre} guardada en PENDIENTE SARA ✓`, { id, duration: 8000 });
+    if (r.ok) {
+      toast.success(`${r.nombre} guardada en PENDIENTE SARA ✓ · ahora, envíala al cliente`, { id, duration: 8000 });
+      setDialogo("correo");
+    }
     else toast.error(`Factura ${data as string} emitida, pero el PDF no: ${r.error}. Pulsa “Generar PDF”.`, { id, duration: 15000 });
   }
 
@@ -261,6 +268,13 @@ export function AccionesFactura({ f, datos, editar }: { f: Factura; datos: Datos
     if (error) return toast.error(error.message);
     toast.success(`${f.codigo} pagada ✓ · cobro apuntado`);
     setDialogo(null);
+  }
+
+  // Para las que se mandaron por otro lado (WhatsApp, en mano…)
+  async function marcarEnviada() {
+    const { error } = await sb.from("facturas").update({ correo_preparado_at: new Date().toISOString() }).eq("id", f.id);
+    if (error) toast.error(error.message);
+    else toast.success(`${f.codigo} marcada como enviada ✓`);
   }
 
   async function deshacerPago() {
@@ -313,14 +327,23 @@ export function AccionesFactura({ f, datos, editar }: { f: Factura; datos: Datos
           <Button size="icon-sm" variant="ghost" aria-label={`Compartir PDF de ${f.codigo}`} onClick={compartir}>
             <Share2 className="size-3.5" aria-hidden />
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setDialogo("correo")}>
-            <Mail className="size-3.5" aria-hidden /> Correo
-          </Button>
+          {porEnviar(f) ? (
+            <>
+              <Button size="sm" onClick={() => setDialogo("correo")}>
+                <Mail className="size-3.5" aria-hidden /> Enviar por correo
+              </Button>
+              <Button size="sm" variant="ghost" onClick={marcarEnviada}>Ya enviada</Button>
+            </>
+          ) : (
+            <Button size="icon-sm" variant="ghost" aria-label={`Volver a enviar ${f.codigo} por correo`} title="Volver a enviar por correo" onClick={() => setDialogo("correo")}>
+              <Mail className="size-3.5" aria-hidden />
+            </Button>
+          )}
         </>
       ) : (
         <Button size="sm" variant="ghost" disabled={ocupado} onClick={pdf}>Generar PDF</Button>
       ))}
-      {f.estado === "emitida" && <Button size="sm" variant="outline" onClick={() => setDialogo("pagar")}>Marcar pagada</Button>}
+      {f.estado === "emitida" && !porEnviar(f) && <Button size="sm" variant="outline" onClick={() => setDialogo("pagar")}>Marcar pagada</Button>}
       {f.estado === "pagada" && <Button size="sm" variant="ghost" onClick={deshacerPago}>Deshacer pago</Button>}
 
       <Dialog open={dialogo === "emitir"} onOpenChange={(a) => !a && setDialogo(null)}>

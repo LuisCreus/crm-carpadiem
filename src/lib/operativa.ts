@@ -135,7 +135,7 @@ export type EventoAvisos = {
 };
 export type FacturaAvisos = {
   id: string; evento_id: string | null; tipo: string; estado: string; importe: number;
-  codigo: string | null; fecha_emision: string | null;
+  codigo: string | null; fecha_emision: string | null; correo_preparado_at?: string | null;
 };
 export type LeadAvisos = { id: string; cliente_nombre: string; estado: string; proxima_accion_fecha: string | null; proxima_accion_texto: string | null };
 
@@ -223,6 +223,11 @@ function avisosFacturas(hoy: string, eventos: EventoAvisos[], facturas: FacturaA
             href, urgente: e.fecha_inicio <= hoy });
         }
       }
+    }
+    // Emitida pero sin enviar al cliente
+    if (f.estado === "emitida" && f.correo_preparado_at === null) {
+      avisos.push({ tipo: "factura", fecha: f.fecha_emision ?? hoy, titulo: `${f.codigo} · ${quien}`, detalle: "Emitida, falta enviarla al cliente", href: "/facturas", urgente: true });
+      continue;
     }
     if (f.estado === "emitida" && f.fecha_emision) {
       const toca = sumarDias(f.fecha_emision, diasCobro);

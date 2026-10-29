@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Cabecera } from "@/components/cabecera";
 import { EstadoVacio } from "@/components/estado-vacio";
-import { LineaFactura, datosEfectivos } from "@/components/facturas";
+import { LineaFactura, datosEfectivos, porEnviar } from "@/components/facturas";
 import { useTablaEnVivo } from "@/hooks/use-tabla-en-vivo";
 import { SELECT_FACTURA, aFactura, uno, type DatosFacturacion, type Factura } from "@/lib/datos/tipos";
 import { totalFactura } from "@/lib/facturacion";
@@ -16,8 +16,8 @@ type FacturaLista = Factura & {
 };
 
 const FILTROS = [
-  ["por_emitir", "Por emitir"],
-  ["sin_cobrar", "Emitidas sin cobrar"],
+  ["por_emitir", "Por emitir o enviar"],
+  ["sin_cobrar", "Enviadas sin cobrar"],
   ["pagadas", "Pagadas"],
   ["todas", "Todas"],
 ] as const;
@@ -38,14 +38,14 @@ export function ListaFacturas() {
   });
 
   const lista = useMemo(() => datos.filter((f) =>
-    filtro === "por_emitir" ? f.estado === "prevista"
-    : filtro === "sin_cobrar" ? f.estado === "emitida"
+    filtro === "por_emitir" ? f.estado === "prevista" || porEnviar(f)
+    : filtro === "sin_cobrar" ? f.estado === "emitida" && !porEnviar(f)
     : filtro === "pagadas" ? f.estado === "pagada"
     : true), [datos, filtro]);
 
   const suma = (l: Factura[]) => l.reduce((s, f) => s + f.importe, 0);
-  const porEmitir = datos.filter((f) => f.estado === "prevista");
-  const sinCobrar = datos.filter((f) => f.estado === "emitida");
+  const porEmitir = datos.filter((f) => f.estado === "prevista" || porEnviar(f));
+  const sinCobrar = datos.filter((f) => f.estado === "emitida" && !porEnviar(f));
   const delAnio = datos.filter((f) => f.estado !== "prevista" && f.anio === anio);
 
   return (
@@ -54,8 +54,8 @@ export function ListaFacturas() {
 
       <div className="mb-5 grid gap-3 sm:grid-cols-3">
         {([
-          ["Por emitir", porEmitir, "por_emitir"],
-          ["Emitidas sin cobrar", sinCobrar, "sin_cobrar"],
+          ["Por emitir o enviar", porEmitir, "por_emitir"],
+          ["Enviadas sin cobrar", sinCobrar, "sin_cobrar"],
           [`Facturado en ${anio}`, delAnio, "todas"],
         ] as const).map(([t, l, f]) => (
           <button key={t} type="button" onClick={() => setFiltro(f)} className="rounded-xl border bg-card p-4 text-left hover:bg-muted/40">
