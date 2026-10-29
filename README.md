@@ -19,7 +19,8 @@ CRM web de CARPADIEM IBÉRICA S.L. para gestionar leads, presupuestos (con la pl
 | 8–9 | Demo con el equipo y producción (datos del Excel importados, carpetas reales) | Hecha |
 | 10 | Arreglos tras revisar el flujo con los datos reales | Hecha |
 | 11 | Facturación: qué falta por facturar, numeración CD AAAA/n, pagadas = cobros | Hecha |
-| 12–16 | Emitir PDF con la plantilla del Excel, correo, facturas recibidas, pagos Santander, rentabilidad | Pendiente |
+| 12 | PDF de las facturas con la plantilla de la hoja Emitir (02. PLANTILLAS/03. FACTURAS) → PENDIENTE SARA | Hecha |
+| 13–16 | Correo con Outlook, facturas recibidas, pagos Santander, rentabilidad y gestoría | Pendiente |
 
 ## Piezas
 
