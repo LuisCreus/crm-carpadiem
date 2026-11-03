@@ -37,6 +37,19 @@ const fila = (clave: string, nombre: string, meses = ceros()): Fila => {
 };
 const restar = (clave: string, nombre: string, a: Fila, ...b: Fila[]) => fila(clave, nombre, a.meses.map((x, i) => b.reduce((s, f) => s - f.meses[i], x)));
 
+// Las líneas de la P&L en orden, con su detalle (para el Excel de la copia de seguridad)
+export function lineasPyg(p: Pyg): { concepto: string; nivel: 0 | 1; fila: Fila }[] {
+  const l = (fila: Fila, nivel: 0 | 1 = 0) => ({ concepto: fila.nombre, nivel, fila });
+  return [
+    l(p.ingresos), ...p.porTipo.map((f) => l(f, 1)),
+    l(p.variables), ...p.porVariable.map((f) => l(f, 1)),
+    l(p.margenBruto),
+    l(p.fijos), ...p.porFijo.map((f) => l(f, 1)),
+    l(p.personal), l(p.director, 1), l(p.bonus, 1),
+    l(p.ebitda), l(p.amortizacion), l(p.ebit), l(p.intereses), l(p.ebt), l(p.impuesto), l(p.neto),
+  ];
+}
+
 // Cuota mensual de un activo en un mes ("aaaa-mm"): desde su mes de compra, durante su vida útil
 export function cuotaActivo(a: Activo, mes: string): number {
   const [ai, mi] = [Number(a.fecha_compra.slice(0, 4)), Number(a.fecha_compra.slice(5, 7))];

@@ -1,5 +1,5 @@
 // Copia de seguridad del CRM en Excel: una foto para consultar, no para editar.
-// Hojas: Presupuestos, Eventos, Leads, Cobros, Facturas, Gastos y Material.
+// Hojas: Presupuestos, Eventos, Leads, Cobros, Facturas, Gastos, Material, P&L, Equipos y Banco.
 
 import ExcelJS from "exceljs";
 
@@ -12,6 +12,9 @@ export type DatosCopia = {
   facturas: Fila[];
   gastos: Fila[];
   material: Fila[];
+  pyg: Fila[];
+  equipos: Fila[];
+  banco: Fila[];
 };
 
 type Columna = { titulo: string; clave: string; ancho?: number; tipo?: "fecha" | "fechaHora" | "euros" | "numero" };
@@ -138,6 +141,47 @@ const HOJAS: { nombre: string; clave: keyof DatosCopia; columnas: Columna[] }[] 
       { titulo: "Notas", clave: "notas", ancho: 32 },
     ],
   },
+  {
+    nombre: "P&L", clave: "pyg", columnas: [
+      { titulo: "Año", clave: "anio", ancho: 7, tipo: "numero" },
+      { titulo: "Concepto", clave: "concepto", ancho: 34 },
+      { titulo: "Ene", clave: "m1", ancho: 10, tipo: "euros" },
+      { titulo: "Feb", clave: "m2", ancho: 10, tipo: "euros" },
+      { titulo: "Mar", clave: "m3", ancho: 10, tipo: "euros" },
+      { titulo: "Abr", clave: "m4", ancho: 10, tipo: "euros" },
+      { titulo: "May", clave: "m5", ancho: 10, tipo: "euros" },
+      { titulo: "Jun", clave: "m6", ancho: 10, tipo: "euros" },
+      { titulo: "Jul", clave: "m7", ancho: 10, tipo: "euros" },
+      { titulo: "Ago", clave: "m8", ancho: 10, tipo: "euros" },
+      { titulo: "Sep", clave: "m9", ancho: 10, tipo: "euros" },
+      { titulo: "Oct", clave: "m10", ancho: 10, tipo: "euros" },
+      { titulo: "Nov", clave: "m11", ancho: 10, tipo: "euros" },
+      { titulo: "Dic", clave: "m12", ancho: 10, tipo: "euros" },
+      { titulo: "Total", clave: "total", ancho: 12, tipo: "euros" },
+    ],
+  },
+  {
+    nombre: "Equipos", clave: "equipos", columnas: [
+      { titulo: "Equipo", clave: "nombre", ancho: 40 },
+      { titulo: "Coste", clave: "coste", ancho: 12, tipo: "euros" },
+      { titulo: "Vida (años)", clave: "vida_anios", ancho: 10, tipo: "numero" },
+      { titulo: "Compra", clave: "fecha_compra", ancho: 12, tipo: "fecha" },
+      { titulo: "Cuota mensual", clave: "cuota", ancho: 12, tipo: "euros" },
+      { titulo: "Cuota de la gestoría", clave: "cuota_manual", ancho: 12, tipo: "euros" },
+      { titulo: "Factura o notas", clave: "notas", ancho: 36 },
+    ],
+  },
+  {
+    nombre: "Banco", clave: "banco", columnas: [
+      { titulo: "Fecha", clave: "fecha", ancho: 12, tipo: "fecha" },
+      { titulo: "Concepto", clave: "concepto", ancho: 60 },
+      { titulo: "Importe", clave: "importe", ancho: 12, tipo: "euros" },
+      { titulo: "Saldo", clave: "saldo", ancho: 12, tipo: "euros" },
+      { titulo: "Estado", clave: "estado", ancho: 12 },
+      { titulo: "Enlazado con", clave: "enlace", ancho: 40 },
+      { titulo: "Notas", clave: "notas", ancho: 32 },
+    ],
+  },
 ];
 
 // "2027-05-08" → fecha de Excel; los timestamps, en hora de Madrid
@@ -166,7 +210,8 @@ export async function generarExcelCopia(datos: DatosCopia, fecha: Date): Promise
     ws.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
     ws.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD63B35" } };
     for (const fila of datos[hoja.clave]) {
-      ws.addRow(Object.fromEntries(hoja.columnas.map((c) => [c.clave, valor(fila[c.clave], c.tipo)])));
+      const r = ws.addRow(Object.fromEntries(hoja.columnas.map((c) => [c.clave, valor(fila[c.clave], c.tipo)])));
+      if (fila.negrita) r.font = { bold: true };
     }
     hoja.columnas.forEach((c, i) => {
       const col = ws.getColumn(i + 1);

@@ -3,7 +3,7 @@ import ExcelJS from "exceljs";
 import { copiasQueSobran, generarExcelCopia, nombreCopia } from "../copias";
 
 describe("copia de seguridad", () => {
-  it("genera las 7 hojas con sus datos y formatos", async () => {
+  it("genera las 10 hojas con sus datos y formatos", async () => {
     const xlsx = await generarExcelCopia({
       presupuestos: [{ codigo: "CD 078", anio: 2026, cliente: "Carlota Durán", estado: "Pendiente", fecha_evento: "2027-05-08", importe: 13246 }],
       eventos: [{ codigo: "CD 063", cliente: "Elena Guinea", fecha_inicio: "2026-09-05", importe: 13070, cobrado: 13070, es_larga_duracion: false }],
@@ -12,11 +12,17 @@ describe("copia de seguridad", () => {
       facturas: [{ estado: "Pagada", codigo: "CD 2026/20", fecha_emision: "2026-09-03", importe: 11870, total: 14362.7 }],
       gastos: [{ estado: "Por pagar", fecha: "2026-11-02", proveedor: "David Mendoza", base: 1000, total: 1060 }],
       material: [{ cliente: "Elena Guinea", material: "Picas 1 m", sentido: "sale", cantidad: 32 }],
+      pyg: [{ anio: 2026, concepto: "Ingresos", negrita: true, m9: 18924, total: 53484 }, { anio: 2026, concepto: "   Boda", m6: 13251, total: 18751 }],
+      equipos: [{ nombre: "2 Carpas beduinas 12×15", coste: 16371.55, vida_anios: 10, fecha_compra: "2026-03-01", cuota: 136.43 }],
+      banco: [{ fecha: "2026-10-28", concepto: "Transferencia Penalagos CD 2026/25", importe: 810.7, estado: "Conciliado", enlace: "Factura CD 2026/25" }],
     }, new Date("2026-11-02T06:00:00Z"));
 
     const libro = new ExcelJS.Workbook();
     await libro.xlsx.load(xlsx.buffer as ArrayBuffer);
-    expect(libro.worksheets.map((w) => w.name)).toEqual(["Presupuestos", "Eventos", "Leads", "Cobros", "Facturas", "Gastos", "Material"]);
+    expect(libro.worksheets.map((w) => w.name)).toEqual(["Presupuestos", "Eventos", "Leads", "Cobros", "Facturas", "Gastos", "Material", "P&L", "Equipos", "Banco"]);
+    const pyg = libro.getWorksheet("P&L")!;
+    expect([pyg.getRow(2).getCell(2).value, pyg.getRow(2).getCell(11).value, pyg.getRow(2).getCell(15).value]).toEqual(["Ingresos", 18924, 53484]);
+    expect(pyg.getRow(2).font?.bold).toBe(true);
     const p = libro.getWorksheet("Presupuestos")!;
     expect(p.getRow(1).getCell(1).value).toBe("Nº");
     expect(p.getRow(2).getCell(1).value).toBe("CD 078");

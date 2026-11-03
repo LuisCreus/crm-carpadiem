@@ -7,13 +7,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { ESTADOS, type EstadoPresupuesto } from "@/lib/negocio";
 import { uno } from "@/lib/datos/tipos";
 import { ESTADOS_FACTURA, TIPOS_FACTURA, totalFactura } from "@/lib/facturacion";
-import { generarExcelCopia, copiasQueSobran, nombreCopia, type DatosCopia } from "@/lib/copias";
+import { generarExcelCopia, copiasQueSobran, fechaMadrid, nombreCopia, type DatosCopia, type Fila } from "@/lib/copias";
+import { calcularPyg, cuotaActivo, lineasPyg, type Activo, type Manual } from "@/lib/pyg";
 import {
   TIPO_XLSX, asegurarCarpeta, eliminarElemento, listarCarpeta, rutaCopias, sharepointConfigurado, subir,
 } from "@/lib/graph/sharepoint";
 
-export async function cargarDatosCopia(sb: SupabaseClient): Promise<DatosCopia> {
-  const [pr, ev, le, co, mv, te, ca, fa, ga, cg] = await Promise.all([
+export async function cargarDatosCopia(sb: SupabaseClient, ahora = new Date()): Promise<DatosCopia> {
+  const [pr, ev, le, co, mv, te, ca, fa, ga, cg, ac, pm, mb] = await Promise.all([
     sb.from("presupuestos").select("*, cliente:clientes(nombre), comercial:comerciales(nombre), intermediario:intermediarios(nombre)")
       .is("deleted_at", null).order("anio").order("numero"),
     sb.from("eventos").select("*, cliente:clientes(nombre), presupuesto:presupuestos(codigo)").is("deleted_at", null).order("fecha_inicio"),
@@ -25,13 +26,18 @@ export async function cargarDatosCopia(sb: SupabaseClient): Promise<DatosCopia> 
     sb.from("facturas").select("*, evento:eventos(cliente:clientes(nombre))").is("deleted_at", null)
       .order("anio", { nullsFirst: false }).order("numero", { nullsFirst: false }),
     sb.from("facturas_recibidas").select("*, proveedor:proveedores(nombre, nif), evento:eventos(cliente:clientes(nombre))").is("deleted_at", null).order("fecha"),
-    sb.from("categorias_gasto").select("codigo, nombre"),
+    sb.from("categorias_gasto").select("codigo, nombre, tipo"),
+    sb.from("activos").select("*").order("fecha_compra"),
+    sb.from("pyg_manual").select("mes, concepto, importe"),
+    sb.from("movimientos_banco").select("*, factura:facturas(codigo), recibida:facturas_recibidas(numero, proveedor:proveedores(nombre))").order("fecha"),
   ]);
-  for (const r of [pr, ev, le, co, mv, fa, ga]) if (r.error) throw new Error(r.error.message);
+  for (const r of [pr, ev, le, co, mv, fa, ga, ac, pm, mb]) if (r.error) throw new Error(r.error.message);
   const categorias = new Map((cg.data ?? []).map((c) => [c.codigo, c.nombre]));
 
   const tipos = new Map((te.data ?? []).map((t) => [t.codigo, t.nombre]));
   const canales = new Map((ca.data ?? []).map((t) => [t.codigo, t.nombre]));
+  const activos: (Activo & { notas: string | null })[] = (ac.data ?? []).map((a) => ({ ...a, coste: Number(a.coste), cuota_manual: a.cuota_manual === null ? null : Number(a.cuota_manual) }));
+  const pyg = cargarPyg(ev.data ?? [], fa.data ?? [], ga.data ?? [], activos, (pm.data ?? []) as Manual[], tipos, cg.data ?? [], ahora);
   const cobradoPor = new Map<string, number>();
   for (const c of co.data ?? []) cobradoPor.set(c.presupuesto_id, (cobradoPor.get(c.presupuesto_id) ?? 0) + Number(c.importe));
 
@@ -78,14 +84,43 @@ export async function cargarDatosCopia(sb: SupabaseClient): Promise<DatosCopia> 
       const e = uno(m.evento) as { cliente: unknown } | null;
       return { ...m, cliente: (uno(e?.cliente) as { nombre: string } | null)?.nombre };
     }),
+    pyg,
+    equipos: activos.map((a) => ({ ...a, cuota: Math.round(cuotaActivo({ ...a, cuota_manual: null }, a.fecha_compra.slice(0, 7)) * 100) / 100 })),
+    banco: (mb.data ?? []).map((m) => {
+      const f = uno(m.factura) as { codigo: string } | null;
+      const r = uno(m.recibida) as { numero: string | null; proveedor: unknown } | null;
+      const proveedor = (uno(r?.proveedor) as { nombre: string } | null)?.nombre;
+      return {
+        ...m, estado: { pendiente: "Por revisar", conciliado: "Conciliado", ignorado: "Ignorado" }[m.estado as string] ?? m.estado,
+        enlace: f ? `Factura ${f.codigo}` : r ? [proveedor ?? "Gasto", r.numero && `nº ${r.numero}`].filter(Boolean).join(" ") : null,
+      };
+    }),
   };
+}
+
+// P&L de cada año desde 2026 hasta el actual, línea a línea (como la pantalla de Finanzas)
+function cargarPyg(eventos: Fila[], facturas: Fila[], gastos: Fila[], activos: Activo[], manual: Manual[], tipos: Map<string, string>,
+  categorias: { codigo: string; nombre: string; tipo: string }[], ahora: Date): Fila[] {
+  const nombres = { tiposEvento: tipos, categorias: new Map(categorias.map((c) => [c.codigo, { nombre: c.nombre, tipo: c.tipo }])) };
+  const ev = eventos.map((e) => ({ ...e, cliente: "", comision_pct: null, importe: e.importe === null ? null : Number(e.importe), importe_retenido: e.importe_retenido === null ? null : Number(e.importe_retenido) })) as Parameters<typeof calcularPyg>[1];
+  const fa = facturas.map((f) => ({ evento_id: f.evento_id as string | null, importe: Number(f.importe), estado: String(f.estado), fecha_emision: f.fecha_emision as string | null }));
+  const ga = gastos.map((g) => ({ evento_id: g.evento_id as string | null, base: Number(g.base), fecha: String(g.fecha), categoria: g.categoria as string | null }));
+  const filas: Fila[] = [];
+  for (let anio = 2026; anio <= Number(fechaMadrid(ahora).slice(0, 4)); anio++) {
+    const p = calcularPyg(anio, ev, ga, fa, activos, manual.map((m) => ({ ...m, importe: Number(m.importe) })), nombres);
+    for (const { concepto, nivel, fila } of lineasPyg(p)) {
+      filas.push({ anio, concepto: nivel ? `   ${concepto}` : concepto, negrita: nivel === 0,
+        ...Object.fromEntries(fila.meses.map((x, i) => [`m${i + 1}`, x || null])), total: fila.total });
+    }
+  }
+  return filas;
 }
 
 export type ResultadoCopia = { nombre: string; webUrl: string; borradas: string[]; filas: number };
 
 export async function hacerCopia(sb: SupabaseClient, ahora = new Date()): Promise<ResultadoCopia> {
   if (!sharepointConfigurado()) throw new Error("SharePoint no está configurado");
-  const datos = await cargarDatosCopia(sb);
+  const datos = await cargarDatosCopia(sb, ahora);
   const xlsx = await generarExcelCopia(datos, ahora);
   const carpeta = rutaCopias();
   await asegurarCarpeta(carpeta);
