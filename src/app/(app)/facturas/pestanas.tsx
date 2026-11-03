@@ -6,9 +6,10 @@ const PESTANAS = [
   ["recibidas", "/facturas/recibidas", "Recibidas (gastos)"],
   ["rentabilidad", "/facturas/rentabilidad", "Rentabilidad"],
   ["gestoria", "/facturas/gestoria", "Gestoría"],
+  ["banco", "/facturas/banco", "Banco"],
 ] as const;
 
-// Emitidas (a clientes) · Recibidas (de proveedores) · Rentabilidad · Gestoría (por trimestre)
+// Emitidas (a clientes) · Recibidas (de proveedores) · Rentabilidad · Gestoría (por trimestre) · Banco (conciliar)
 export function PestanasFacturas({ activa }: { activa: (typeof PESTANAS)[number][0] }) {
   return (
     <nav aria-label="Facturas" className="mb-5 inline-flex max-w-full overflow-x-auto rounded-lg border text-sm">

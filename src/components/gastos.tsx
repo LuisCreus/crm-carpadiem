@@ -26,7 +26,7 @@ import { formatoIban, type DatosLeidos } from "@/lib/leer-factura";
 type EventoOpcion = { id: string; texto: string };
 
 // Eventos para elegir a cuál va el gasto (los más recientes primero)
-function useEventosOpciones() {
+export function useEventosOpciones() {
   const { datos } = useTablaEnVivo<EventoOpcion>(["eventos", "clientes"], async (sb) => {
     const { data } = await sb.from("eventos").select("id, fecha_inicio, cliente:clientes(nombre)")
       .is("deleted_at", null).order("fecha_inicio", { ascending: false, nullsFirst: false });
@@ -38,7 +38,7 @@ function useEventosOpciones() {
   return datos;
 }
 
-function useProveedores() {
+export function useProveedores() {
   const { datos } = useTablaEnVivo<Proveedor>(["proveedores"], async (sb) => {
     const { data } = await sb.from("proveedores").select("id, nombre, nif, iban, email, categoria").is("deleted_at", null).order("nombre");
     return (data ?? []) as Proveedor[];
