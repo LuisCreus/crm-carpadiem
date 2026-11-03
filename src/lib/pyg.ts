@@ -101,7 +101,7 @@ export function calcularPyg(anio: number, eventos: EventoPyg[], gastos: GastoPyg
   const tVariables = total("variables", "Costes variables", porVariable);
   const margenBruto = restar("margen", "Margen bruto", tIngresos, tVariables);
   const tFijos = total("fijos", "Costes fijos", porFijo);
-  const director = fila("director", "Director", sueldo.map((x, i) => x + aMano("director")[i]));
+  const director = fila("director", "Director", sueldo);
   const bonus = fila("bonus", "Bonus director", aMano("bonus"));
   const personal = total("personal", "Costes de personal", [director, bonus]);
   const ebitda = restar("ebitda", "EBITDA", margenBruto, tFijos, personal);

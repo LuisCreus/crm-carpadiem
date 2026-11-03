@@ -28,7 +28,7 @@ export const MESES = [
   "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
 ];
 
-const redondear = (n: number) => Math.round(n * 100) / 100;
+const redondear = (n: number) => Math.round((n + Math.sign(n) * Number.EPSILON) * 100 * (1 + Number.EPSILON)) / 100;
 
 export function importeReserva(importe: number | null, reservaPct: number | null): number | null {
   if (importe === null || reservaPct === null) return null;

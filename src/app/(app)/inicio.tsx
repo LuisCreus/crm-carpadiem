@@ -46,7 +46,7 @@ export function Inicio() {
     else toast.success("Anotado ✓ · Te lo recuerdo en una semana si no cambia");
   }
 
-  const { datos, cargando } = useTablaEnVivo<Datos>(
+  const { datos, cargando, error, recargar } = useTablaEnVivo<Datos>(
     ["presupuestos", "eventos", "cobros", "leads", "clientes", "ajustes", "facturas", "facturas_recibidas"],
     async (sb) => {
       const [pr, ev, co, le, aj, fa, ga] = await Promise.all([
@@ -60,6 +60,8 @@ export function Inicio() {
         sb.from("facturas").select("id, evento_id, tipo, estado, importe, codigo, fecha_emision, correo_preparado_at").is("deleted_at", null).or("estado.neq.pagada,tipo.eq.mensualidad"),
         sb.from("facturas_recibidas").select("id, total, vencimiento, estado, proveedor:proveedores(nombre)").is("deleted_at", null).eq("estado", "pendiente"),
       ]);
+      const fallo = [pr, ev, co, le, aj, fa, ga].find((r) => r.error);
+      if (fallo?.error) throw new Error(fallo.error.message);
       const cobrado = new Map<string, number>();
       for (const c of co.data ?? []) cobrado.set(c.presupuesto_id, (cobrado.get(c.presupuesto_id) ?? 0) + Number(c.importe));
       const presupuestos = (pr.data ?? []).map((p) => ({
@@ -86,7 +88,12 @@ export function Inicio() {
           lugar: [e.ubicacion, e.provincia].filter(Boolean).join(", "), modalidad: e.modalidad,
         }));
       // Teléfono y email para llamar o escribir desde el aviso
-      const clientes = [...new Set([...presupuestos.map((p) => p.cliente_id), ...eventos.map((e) => e.cliente_id)])];
+      // Solo los clientes que salen en los avisos (no todos: la consulta sería enorme)
+      const enAvisos = new Set(avisos.map((a) => a.href));
+      const clientes = [...new Set([
+        ...presupuestos.filter((p) => enAvisos.has(`/presupuestos/${p.id}`)).map((p) => p.cliente_id),
+        ...eventos.filter((e) => enAvisos.has(`/eventos/${e.id}`)).map((e) => e.cliente_id),
+      ])];
       const { data: contactos } = clientes.length
         ? await sb.from("contactos").select("cliente_id, telefono, email").in("cliente_id", clientes).is("deleted_at", null).order("orden")
         : { data: [] };
@@ -113,6 +120,11 @@ export function Inicio() {
             Hoy y esta semana {d && d.avisos.length > 0 && <span className="ml-1 text-muted-foreground">({d.avisos.length})</span>}
           </h2>
           {cargando && <p className="px-5 py-4 text-sm text-muted-foreground">Cargando…</p>}
+          {error && (
+            <p role="alert" className="px-5 py-4 text-sm text-destructive">
+              No se han podido cargar los avisos ({error}). <button type="button" className="underline" onClick={() => void recargar()}>Reintentar</button>
+            </p>
+          )}
           {d && d.avisos.length === 0 && <p className="px-5 py-6 text-sm text-muted-foreground">Nada pendiente. ✓</p>}
           <ul>
             {d?.avisos.map((a, i) => {

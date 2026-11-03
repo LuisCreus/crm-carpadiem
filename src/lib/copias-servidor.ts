@@ -8,28 +8,39 @@ import { ESTADOS, type EstadoPresupuesto } from "@/lib/negocio";
 import { uno } from "@/lib/datos/tipos";
 import { ESTADOS_FACTURA, TIPOS_FACTURA, totalFactura } from "@/lib/facturacion";
 import { generarExcelCopia, copiasQueSobran, fechaMadrid, nombreCopia, type DatosCopia, type Fila } from "@/lib/copias";
+import { leerTodo } from "@/lib/supabase/leer-todo";
 import { calcularPyg, cuotaActivo, lineasPyg, type Activo, type Manual } from "@/lib/pyg";
 import {
   TIPO_XLSX, asegurarCarpeta, eliminarElemento, listarCarpeta, rutaCopias, sharepointConfigurado, subir,
 } from "@/lib/graph/sharepoint";
 
+// Una tabla entera, por tandas de 1.000 (orden estable: se desempata por id)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function todas(q: () => any): Promise<{ data: any[] | null; error: { message: string } | null }> {
+  try {
+    return { data: await leerTodo((desde, hasta) => q().range(desde, hasta)), error: null };
+  } catch (e) {
+    return { data: null, error: { message: e instanceof Error ? e.message : "Error al leer" } };
+  }
+}
+
 export async function cargarDatosCopia(sb: SupabaseClient, ahora = new Date()): Promise<DatosCopia> {
   const [pr, ev, le, co, mv, te, ca, fa, ga, cg, ac, pm, mb] = await Promise.all([
-    sb.from("presupuestos").select("*, cliente:clientes(nombre), comercial:comerciales(nombre), intermediario:intermediarios(nombre)")
-      .is("deleted_at", null).order("anio").order("numero"),
-    sb.from("eventos").select("*, cliente:clientes(nombre), presupuesto:presupuestos(codigo)").is("deleted_at", null).order("fecha_inicio"),
-    sb.from("leads").select("*, comercial:comerciales(nombre)").is("deleted_at", null).order("fecha_primer_contacto"),
-    sb.from("cobros").select("*, presupuesto:presupuestos(codigo, cliente:clientes(nombre))").is("deleted_at", null).order("fecha"),
-    sb.from("material_movimientos").select("*, evento:eventos(cliente:clientes(nombre))").is("deleted_at", null).order("created_at"),
+    todas(() => sb.from("presupuestos").select("*, cliente:clientes(nombre), comercial:comerciales(nombre), intermediario:intermediarios(nombre)")
+      .is("deleted_at", null).order("anio").order("numero").order("id")),
+    todas(() => sb.from("eventos").select("*, cliente:clientes(nombre), presupuesto:presupuestos(codigo)").is("deleted_at", null).order("fecha_inicio").order("id")),
+    todas(() => sb.from("leads").select("*, comercial:comerciales(nombre)").is("deleted_at", null).order("fecha_primer_contacto").order("id")),
+    todas(() => sb.from("cobros").select("*, presupuesto:presupuestos(codigo, cliente:clientes(nombre))").is("deleted_at", null).order("fecha").order("id")),
+    todas(() => sb.from("material_movimientos").select("*, evento:eventos(cliente:clientes(nombre))").is("deleted_at", null).order("created_at").order("id")),
     sb.from("tipos_evento").select("codigo, nombre"),
     sb.from("canales_lead").select("codigo, nombre"),
-    sb.from("facturas").select("*, evento:eventos(cliente:clientes(nombre))").is("deleted_at", null)
-      .order("anio", { nullsFirst: false }).order("numero", { nullsFirst: false }),
-    sb.from("facturas_recibidas").select("*, proveedor:proveedores(nombre, nif), evento:eventos(cliente:clientes(nombre))").is("deleted_at", null).order("fecha"),
+    todas(() => sb.from("facturas").select("*, evento:eventos(cliente:clientes(nombre))").is("deleted_at", null)
+      .order("anio", { nullsFirst: false }).order("numero", { nullsFirst: false }).order("id")),
+    todas(() => sb.from("facturas_recibidas").select("*, proveedor:proveedores(nombre, nif), evento:eventos(cliente:clientes(nombre))").is("deleted_at", null).order("fecha").order("id")),
     sb.from("categorias_gasto").select("codigo, nombre, tipo"),
     sb.from("activos").select("*").order("fecha_compra"),
     sb.from("pyg_manual").select("mes, concepto, importe"),
-    sb.from("movimientos_banco").select("*, factura:facturas(codigo), recibida:facturas_recibidas(numero, proveedor:proveedores(nombre))").order("fecha"),
+    todas(() => sb.from("movimientos_banco").select("*, factura:facturas(codigo), recibida:facturas_recibidas(numero, proveedor:proveedores(nombre))").order("fecha").order("id")),
   ]);
   for (const r of [pr, ev, le, co, mv, fa, ga, ac, pm, mb]) if (r.error) throw new Error(r.error.message);
   const categorias = new Map((cg.data ?? []).map((c) => [c.codigo, c.nombre]));

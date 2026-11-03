@@ -20,6 +20,7 @@ import { SELECT_FACTURA_RECIBIDA, aFacturaRecibida, uno } from "@/lib/datos/tipo
 import { totalFactura } from "@/lib/facturacion";
 import { formatoEuros, formatoFecha } from "@/lib/formato";
 import { crearClienteNavegador } from "@/lib/supabase/client";
+import { leerTodo } from "@/lib/supabase/leer-todo";
 import { cn } from "@/lib/utils";
 import { PestanasFacturas } from "../pestanas";
 
@@ -44,8 +45,9 @@ export function PantallaBanco() {
 
   const { datos, cargando } = useTablaEnVivo<Datos>(["movimientos_banco", "reglas_banco", "facturas", "facturas_recibidas"], async (sb) => {
     const [m, e, r, g] = await Promise.all([
-      sb.from("movimientos_banco").select("id, fecha, concepto, importe, saldo, estado, factura_id, factura_recibida_id, notas")
-        .order("fecha", { ascending: false }).order("created_at", { ascending: false }),
+      leerTodo((desde, hasta) => sb.from("movimientos_banco").select("id, fecha, concepto, importe, saldo, estado, factura_id, factura_recibida_id, notas")
+        .order("fecha", { ascending: false }).order("created_at", { ascending: false }).order("id").range(desde, hasta))
+        .then((data) => ({ data, error: null }), (e: Error) => ({ data: null, error: { message: e.message } })),
       sb.from("facturas").select("id, codigo, anio, numero, importe, iva_pct, suplidos, estado, fact_nombre, cliente:clientes(nombre)")
         .is("deleted_at", null).neq("estado", "prevista"),
       sb.from("facturas_recibidas").select(SELECT_FACTURA_RECIBIDA).is("deleted_at", null),

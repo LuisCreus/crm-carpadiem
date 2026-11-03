@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { crearClienteServicio } from "@/lib/supabase/servicio";
 import { hacerCopia } from "@/lib/copias-servidor";
+// Generar documentos con Microsoft puede tardar: hasta 60 sexport const maxDuration = 60;
 
 // Copia semanal automática: la llama Vercel cada lunes (ver vercel.json).
 // Solo responde a quien traiga la clave CRON_SECRET.

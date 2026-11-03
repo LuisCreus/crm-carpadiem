@@ -60,7 +60,7 @@ describe("P&L", () => {
 
   it("el impuesto va sobre el acumulado y el mes con pérdidas compensa", () => {
     const facturas = [{ evento_id: null, importe: 1000, estado: "emitida", fecha_emision: "2026-02-10" }, { evento_id: null, importe: 3000, estado: "emitida", fecha_emision: "2026-03-10" }];
-    const manual = [{ mes: "2026-01-01", concepto: "director" as const, importe: 2000 }];
+    const manual = [{ mes: "2026-01-01", concepto: "bonus" as const, importe: 2000 }];
     const p = calcularPyg(2026, [], [], facturas, [], manual, nombres);
     expect(p.impuesto.meses.slice(0, 3)).toEqual([0, 0, 300]); // (−2000 + 1000 + 3000) × 15 %
     expect(p.impuesto.total).toBe(300);

@@ -59,7 +59,7 @@ export function FichaEvento({ id }: { id: string }) {
   const [editar, setEditar] = useState(false);
   const [caido, setCaido] = useState(false);
   const [contacto, setContacto] = useState<Contacto | "nuevo" | null>(null);
-  const { datos, cargando } = useTablaEnVivo<Datos>(
+  const { datos, cargando, error, recargar } = useTablaEnVivo<Datos>(
     ["eventos", "cobros", "contactos", "clientes", "presupuestos", "evento_montadores", "material_movimientos", "evento_material", "inventario"],
     async (sb) => {
       const { data, error } = await sb.from("eventos").select(SELECT_EVENTO).eq("id", id).maybeSingle();
@@ -78,6 +78,8 @@ export function FichaEvento({ id }: { id: string }) {
           .eq("estado", "activo").is("deleted_at", null),
         sb.from("ajustes").select("dias_limite_seguro").maybeSingle(),
       ]);
+      const fallo = [ct, co, mo, mv, res, inv, todos, aj].find((r) => r && "error" in r && r.error);
+      if (fallo && "error" in fallo && fallo.error) throw new Error(fallo.error.message);
       const reservasTodas = (res.data ?? []) as (ReservaMaterial & { evento_id: string })[];
       const inventario = ((inv.data ?? []) as ItemInventario[]).map((i) => ({ ...i, cantidad: Number(i.cantidad) }));
       const ocupacion: EventoOcupacion[] = (todos.data ?? []).flatMap((ev) => {
@@ -101,6 +103,7 @@ export function FichaEvento({ id }: { id: string }) {
 
   const d = datos[0];
   if (cargando) return <p className="text-sm text-muted-foreground">Cargando…</p>;
+  if (error && !d) return <p role="alert" className="text-sm text-destructive">No se ha podido cargar el evento ({error}). <button type="button" className="underline" onClick={() => void recargar()}>Reintentar</button></p>;
   if (!d) return <p className="text-sm text-muted-foreground">Este evento no existe o está en la papelera.</p>;
   const { e, contactos, cobrado, montadores, movimientos, reservas, inventario, solapes } = d;
   const sb = crearClienteNavegador();

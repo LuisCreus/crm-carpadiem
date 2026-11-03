@@ -95,7 +95,8 @@ const horario = (inicio: string | null, fin: string | null) => {
   if (!inicio) return "Por definir";
   const desde = fechaHora(inicio)!;
   if (!fin) return desde;
-  const mismoDia = inicio.slice(0, 10) === fin.slice(0, 10);
+  const dia = (x: string) => new Date(x).toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" });
+  const mismoDia = dia(inicio) === dia(fin);
   const hasta = mismoDia
     ? new Date(fin).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" })
     : fechaHora(fin)!;

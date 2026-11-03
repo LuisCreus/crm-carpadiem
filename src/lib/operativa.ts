@@ -1,6 +1,7 @@
 // Operativa de eventos: control de material, solapes de inventario, avisos y números.
 // Funciones puras (sin base de datos) para poder probarlas con tests.
 
+import { formatoEuros, hoyMadrid } from "@/lib/formato";
 import { avisarSeguro, fechaLimiteSeguro, type EstadoPresupuesto, type PrecisionFecha } from "@/lib/negocio";
 import { cuotaDelMes, mensualidadesPendientes, nombreMes, ultimoDia, type Cuota } from "@/lib/cuotas";
 
@@ -13,7 +14,9 @@ export function sumarDias(fecha: string, dias: number): string {
   return new Date(Date.UTC(a, m - 1, d + dias)).toISOString().slice(0, 10);
 }
 
-export const diaDe = (fechaHora: string | null | undefined) => (fechaHora ? fechaHora.slice(0, 10) : null);
+// "2026-11-07" se queda igual; un instante ("2026-11-06T23:30:00Z") pasa al día de Madrid (el 7)
+export const diaDe = (fechaHora: string | null | undefined) =>
+  !fechaHora ? null : fechaHora.length <= 10 ? fechaHora : hoyMadrid(new Date(fechaHora));
 
 // Lunes y domingo de la semana de "hoy"
 export function semanaDe(hoy: string): { desde: string; hasta: string } {
@@ -206,7 +209,7 @@ export function calcularAvisos(
     // Cobro pendiente después del evento
     const fin = e.fecha_fin ?? e.fecha_inicio;
     if (e.fecha_precision === "dia" && fin && fin < hoy && e.importe !== null && e.cobrado < e.importe) {
-      avisos.push({ tipo: "cobro", fecha: fin, titulo: e.cliente, detalle: `Evento del ${formatoCorto(fin)} · faltan ${(e.importe - e.cobrado).toLocaleString("es-ES", { maximumFractionDigits: 2 })} €`, href: `/eventos/${e.id}`, urgente: true });
+      avisos.push({ tipo: "cobro", fecha: fin, titulo: e.cliente, detalle: `Evento del ${formatoCorto(fin)} · faltan ${formatoEuros(e.importe - e.cobrado)}`, href: `/eventos/${e.id}`, urgente: true });
     }
   }
 

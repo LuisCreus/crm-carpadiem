@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { descargar } from "@/lib/graph/sharepoint";
+// Generar documentos con Microsoft puede tardar: hasta 60 sexport const maxDuration = 60;
 
 // Descarga el PDF de una versión (de SharePoint o, en el plan B, de Supabase Storage).
 // Sirve para "Descargar PDF" y para "Compartir" en el móvil.

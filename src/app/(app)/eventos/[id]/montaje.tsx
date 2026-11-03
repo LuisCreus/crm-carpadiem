@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+import { compartirPdf } from "@/lib/compartir";
 import { Download, FileText, Share2 } from "lucide-react";
 import { Campo, claseSelect } from "@/components/campo";
 import { Button } from "@/components/ui/button";
@@ -70,17 +71,9 @@ export function TarjetaMontaje({ evento: e, contactos, montadoresAsignados }: {
   }
 
   async function compartir() {
-    try {
-      const r = await fetch(`/api/hoja-montaje/${e.id}`);
-      if (!r.ok) throw new Error("No se pudo generar la hoja");
-      const nombre = decodeURIComponent(r.headers.get("Content-Disposition")?.match(/filename\*=UTF-8''(.+)$/)?.[1] ?? "hoja-de-montaje.pdf");
-      const archivo = new File([await r.blob()], nombre, { type: "application/pdf" });
-      if (navigator.canShare?.({ files: [archivo] })) await navigator.share({ files: [archivo], title: nombre });
-      else window.open(`/api/hoja-montaje/${e.id}?ver=1`, "_blank");
-    } catch (err) {
-      if (err instanceof Error && err.name !== "AbortError") toast.error(err.message);
-    }
+    await compartirPdf(`/api/hoja-montaje/${e.id}`, "hoja-de-montaje.pdf");
   }
+
 
   const fila = (clave: "montaje_inicio" | "montaje_fin" | "desmontaje_inicio" | "desmontaje_fin", etiqueta: string) => (
     <Campo id={`m-${clave}`} etiqueta={etiqueta}>

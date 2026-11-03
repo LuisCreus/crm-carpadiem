@@ -13,6 +13,7 @@ import { CONCEPTOS_COBRO, type Contacto, type Presupuesto } from "@/lib/datos/ti
 import { formatoEuros, hoyMadrid, leerEuros } from "@/lib/formato";
 import type { PrecisionFecha } from "@/lib/negocio";
 import { cn } from "@/lib/utils";
+import { useUnaVez } from "@/hooks/use-una-vez";
 
 type Abierto = { abierto: boolean; cerrar: () => void };
 
@@ -91,6 +92,7 @@ export function DialogoRechazar({ abierto, cerrar, presupuesto }: Abierto & { pr
 export function DialogoCobro({ abierto, cerrar, presupuestoId, pendiente, reservaPendiente }: Abierto & {
   presupuestoId: string; pendiente: number | null; reservaPendiente: number | null;
 }) {
+  const { enCurso, unaVez } = useUnaVez();
   const hoy = hoyMadrid();
   const [fecha, setFecha] = useState(hoy);
   const [importe, setImporte] = useState("");
@@ -117,7 +119,7 @@ export function DialogoCobro({ abierto, cerrar, presupuestoId, pendiente, reserv
           <DialogTitle>Apuntar cobro</DialogTitle>
           {pendiente !== null && <DialogDescription>Pendiente de cobro: {formatoEuros(pendiente)}</DialogDescription>}
         </DialogHeader>
-        <form id="form-cobro" onSubmit={guardar} className="grid gap-4 sm:grid-cols-2">
+        <form id="form-cobro" onSubmit={unaVez(guardar)} className="grid gap-4 sm:grid-cols-2">
           <Campo id="cobro-importe" etiqueta="Importe (€)">
             <Input id="cobro-importe" inputMode="decimal" autoFocus required value={importe} onChange={(e) => setImporte(e.target.value)} />
           </Campo>
@@ -145,7 +147,7 @@ export function DialogoCobro({ abierto, cerrar, presupuestoId, pendiente, reserv
         </form>
         <DialogFooter>
           <Button variant="outline" onClick={cerrar}>Cancelar</Button>
-          <Button type="submit" form="form-cobro">Guardar cobro</Button>
+          <Button type="submit" form="form-cobro" disabled={enCurso}>Guardar cobro</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -153,6 +155,7 @@ export function DialogoCobro({ abierto, cerrar, presupuestoId, pendiente, reserv
 }
 
 export function DialogoDatos({ abierto, cerrar, presupuesto }: Abierto & { presupuesto: Presupuesto }) {
+  const { enCurso, unaVez } = useUnaVez();
   const listas = useListas();
   const p = presupuesto;
   const [precision, setPrecision] = useState<PrecisionFecha>(p.fecha_precision);
@@ -214,7 +217,7 @@ export function DialogoDatos({ abierto, cerrar, presupuesto }: Abierto & { presu
           <DialogTitle>Editar datos de {p.codigo}</DialogTitle>
           <DialogDescription>Si cambian la fecha o el cliente, el CRM te propondrá mover o renombrar la carpeta. Los cambios pasan también al evento.</DialogDescription>
         </DialogHeader>
-        <form id="form-datos" onSubmit={guardar} className="grid gap-4 sm:grid-cols-2">
+        <form id="form-datos" onSubmit={unaVez(guardar)} className="grid gap-4 sm:grid-cols-2">
           <Campo id="d-cliente" etiqueta="Cliente" className="sm:col-span-2">
             <Input id="d-cliente" value={campos.cliente} onChange={(e) => set("cliente", e.target.value)} />
           </Campo>
@@ -289,7 +292,7 @@ export function DialogoDatos({ abierto, cerrar, presupuesto }: Abierto & { presu
         </form>
         <DialogFooter>
           <Button variant="outline" onClick={cerrar}>Cancelar</Button>
-          <Button type="submit" form="form-datos">Guardar</Button>
+          <Button type="submit" form="form-datos" disabled={enCurso}>Guardar</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -297,6 +300,7 @@ export function DialogoDatos({ abierto, cerrar, presupuesto }: Abierto & { presu
 }
 
 export function DialogoContacto({ abierto, cerrar, clienteId, contacto }: Abierto & { clienteId: string; contacto?: Contacto }) {
+  const { enCurso, unaVez } = useUnaVez();
   const listas = useListas();
   const [c, setC] = useState({
     nombre: contacto?.nombre ?? "", rol: contacto?.rol ?? "", telefono: contacto?.telefono ?? "", email: contacto?.email ?? "",
@@ -319,7 +323,7 @@ export function DialogoContacto({ abierto, cerrar, clienteId, contacto }: Abiert
     <Dialog open={abierto} onOpenChange={(a) => !a && cerrar()}>
       <DialogContent>
         <DialogHeader><DialogTitle>{contacto ? "Editar contacto" : "Nuevo contacto"}</DialogTitle></DialogHeader>
-        <form id="form-contacto" onSubmit={guardar} className="grid gap-4 sm:grid-cols-2">
+        <form id="form-contacto" onSubmit={unaVez(guardar)} className="grid gap-4 sm:grid-cols-2">
           <Campo id="c-nombre" etiqueta="Nombre"><Input id="c-nombre" required autoFocus value={c.nombre} onChange={(e) => setC({ ...c, nombre: e.target.value })} /></Campo>
           <Campo id="c-rol" etiqueta="Rol">
             <select id="c-rol" className={claseSelect} value={c.rol} onChange={(e) => setC({ ...c, rol: e.target.value })}>
@@ -332,7 +336,7 @@ export function DialogoContacto({ abierto, cerrar, clienteId, contacto }: Abiert
         </form>
         <DialogFooter>
           <Button variant="outline" onClick={cerrar}>Cancelar</Button>
-          <Button type="submit" form="form-contacto">Añadir</Button>
+          <Button type="submit" form="form-contacto" disabled={enCurso}>Añadir</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

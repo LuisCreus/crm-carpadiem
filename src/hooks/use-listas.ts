@@ -1,6 +1,6 @@
 "use client";
 
-import { useTablaEnVivo } from "@/hooks/use-tabla-en-vivo";
+import { useCompartido } from "@/hooks/use-compartido";
 import type { Comercial, IntermediarioCorto, Opcion } from "@/lib/datos/tipos";
 
 type Listas = {
@@ -16,9 +16,9 @@ type Listas = {
 
 const VACIAS: Listas = { comerciales: [], tiposCliente: [], tiposEvento: [], rolesContacto: [], canales: [], intermediarios: [], montadores: [], categoriasGasto: [] };
 
-// Listas editables (comerciales, tipos…) siempre al día
+// Listas editables (comerciales, tipos…) siempre al día. Una sola carga para toda la pantalla.
 export function useListas() {
-  const { datos } = useTablaEnVivo<Listas>(
+  const { datos } = useCompartido<Listas>("listas",
     ["comerciales", "tipos_cliente", "tipos_evento", "roles_contacto", "canales_lead", "intermediarios", "montadores", "categorias_gasto"],
     async (sb) => {
       const activos = (tabla: string, campos: string) =>
@@ -33,7 +33,9 @@ export function useListas() {
         activos("montadores", "id, nombre"),
         activos("categorias_gasto", "codigo, nombre, tipo"),
       ]);
-      return [{
+      const fallo = [c, tc, te, rc, ca, i, mo, cg].find((r) => r.error);
+      if (fallo?.error) throw new Error(fallo.error.message);
+      return {
         comerciales: (c.data ?? []) as unknown as Comercial[],
         tiposCliente: (tc.data ?? []) as unknown as Opcion[],
         tiposEvento: (te.data ?? []) as unknown as Opcion[],
@@ -42,10 +44,10 @@ export function useListas() {
         intermediarios: (i.data ?? []) as unknown as IntermediarioCorto[],
         montadores: (mo.data ?? []) as unknown as Comercial[],
         categoriasGasto: (cg.data ?? []) as unknown as Opcion[],
-      }];
+      };
     },
   );
-  return datos[0] ?? VACIAS;
+  return datos ?? VACIAS;
 }
 
 export function nombreDe(lista: Opcion[], codigo: string | null | undefined): string {

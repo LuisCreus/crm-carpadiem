@@ -24,7 +24,7 @@ const mismoImporte = (a: number, b: number) => Math.abs(Math.abs(a) - Math.abs(b
 
 function puntosEmitida(concepto: string, f: EmitidaC) {
   let p = 0;
-  if (f.anio && f.numero && (concepto.includes(`${f.anio}/${f.numero}`) || new RegExp(`\\bCD\\s*0*${f.numero}\\b`).test(concepto))) p += 2;
+  if (f.anio && f.numero && new RegExp(`(^|[^0-9])(${f.anio}\\s*/\\s*0*${f.numero}|CD\\s*${f.anio}\\s*/\\s*0*${f.numero})(?![0-9])`).test(concepto)) p += 2;
   if (palabras(f.cliente).some((w) => concepto.includes(w))) p += 1;
   return p;
 }

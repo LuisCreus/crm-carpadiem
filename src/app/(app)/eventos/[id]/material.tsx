@@ -11,6 +11,7 @@ import { crearClienteNavegador } from "@/lib/supabase/client";
 import { moverAPapelera } from "@/lib/datos/papelera";
 import { formatoFecha, hoyMadrid } from "@/lib/formato";
 import { controlMaterial, type EstadoMaterial, type Solape } from "@/lib/operativa";
+import { useUnaVez } from "@/hooks/use-una-vez";
 
 export type MovimientoMaterial = { id: string; material: string; cantidad: number; sentido: "sale" | "entra"; fecha: string | null; notas: string | null };
 export type ReservaMaterial = { id: string; inventario_id: string; cantidad: number };
@@ -29,6 +30,7 @@ const hoy = () => hoyMadrid();
 export function TarjetaMaterialReservado({ eventoId, reservas, inventario, solapes }: {
   eventoId: string; reservas: ReservaMaterial[]; inventario: ItemInventario[]; solapes: Solape[];
 }) {
+  const { enCurso, unaVez } = useUnaVez();
   const sb = crearClienteNavegador();
   const [item, setItem] = useState("");
   const [cantidad, setCantidad] = useState("1");
@@ -74,13 +76,13 @@ export function TarjetaMaterialReservado({ eventoId, reservas, inventario, solap
         ))}
       </ul>
       {inventario.length > 0 && (
-        <form onSubmit={anadir} className="mt-3 flex gap-2">
+        <form onSubmit={unaVez(anadir)} className="mt-3 flex gap-2">
           <select aria-label="Material" className={claseSelect} value={item} onChange={(e) => setItem(e.target.value)}>
             <option value="">Añadir material…</option>
             {inventario.map((i) => <option key={i.id} value={i.id}>{i.material} ({i.cantidad} {i.unidad})</option>)}
           </select>
           <Input aria-label="Cantidad" type="number" min={0.5} step="0.5" className="w-20" value={cantidad} onChange={(e) => setCantidad(e.target.value)} />
-          <Button type="submit" variant="outline">Añadir</Button>
+          <Button type="submit" variant="outline" disabled={enCurso}>Añadir</Button>
         </form>
       )}
     </section>
@@ -91,6 +93,7 @@ export function TarjetaMaterialReservado({ eventoId, reservas, inventario, solap
 export function TarjetaControlMaterial({ eventoId, movimientos, inventario }: {
   eventoId: string; movimientos: MovimientoMaterial[]; inventario: ItemInventario[];
 }) {
+  const { enCurso, unaVez } = useUnaVez();
   const sb = crearClienteNavegador();
   const [nuevo, setNuevo] = useState({ material: "", cantidad: "", sentido: "sale" as "sale" | "entra", fecha: hoy(), notas: "" });
   const lineas = controlMaterial(movimientos.map((m) => ({ ...m, cantidad: Number(m.cantidad) })));
@@ -150,7 +153,7 @@ export function TarjetaControlMaterial({ eventoId, movimientos, inventario }: {
         </div>
       )}
 
-      <form onSubmit={anadir} className="mt-4 grid gap-2 border-t pt-4 sm:grid-cols-[1.6fr_0.7fr_0.9fr_1fr_auto]">
+      <form onSubmit={unaVez(anadir)} className="mt-4 grid gap-2 border-t pt-4 sm:grid-cols-[1.6fr_0.7fr_0.9fr_1fr_auto]">
         <Input aria-label="Material" list="inventario-materiales" placeholder="Material" value={nuevo.material} onChange={(e) => setNuevo({ ...nuevo, material: e.target.value })} />
         <datalist id="inventario-materiales">{inventario.map((i) => <option key={i.id} value={i.material} />)}</datalist>
         <Input aria-label="Cantidad" type="number" min={0} step="1" placeholder="Cant." value={nuevo.cantidad} onChange={(e) => setNuevo({ ...nuevo, cantidad: e.target.value })} />
@@ -159,7 +162,7 @@ export function TarjetaControlMaterial({ eventoId, movimientos, inventario }: {
           <option value="entra">Entra</option>
         </select>
         <Input aria-label="Fecha" type="date" value={nuevo.fecha} onChange={(e) => setNuevo({ ...nuevo, fecha: e.target.value })} />
-        <Button type="submit" variant="outline">Apuntar</Button>
+        <Button type="submit" variant="outline" disabled={enCurso}>Apuntar</Button>
       </form>
 
       {movimientos.length > 0 && (

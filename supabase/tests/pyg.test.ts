@@ -17,11 +17,11 @@ const activosDe = async (factura: string) =>
   (await db.query<{ coste: string; vida_anios: number }>("select coste::text, vida_anios from public.activos where factura_recibida_id = $1", [factura])).rows;
 
 describe("P&L: CAPEX y datos a mano", () => {
-  it("el CAPEX del Excel y el sueldo del director están cargados", async () => {
+  it("el CAPEX del Excel está cargado; el sueldo del director no va a mano (sale de Maketa)", async () => {
     const a = await db.query<{ n: number; total: string }>("select count(*)::int n, sum(coste)::text total from public.activos");
     expect(a.rows[0]).toEqual({ n: 9, total: "52142.41" });
     const d = await db.query<{ n: number }>("select count(*)::int n from public.pyg_manual where concepto = 'director' and importe = 1100");
-    expect(d.rows[0].n).toBe(7);
+    expect(d.rows[0].n).toBe(0);
   });
 
   it("una factura de material de carpas entra sola en el CAPEX y sale si cambia de categoría o va a la papelera", async () => {

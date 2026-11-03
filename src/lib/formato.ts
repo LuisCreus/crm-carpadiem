@@ -54,9 +54,9 @@ export function codigoPresupuesto(numero: number): string {
 
 // Lee un importe escrito a la española: "1.500", "3.973,80", "13246 €" → número (null si no se entiende)
 export function leerEuros(texto: string): number | null {
-  let t = texto.replace(/[€\s]/g, "");
+  let t = texto.replace(/[€\s]/g, "").replace(/^\+/, "");
   if (t.includes(",")) t = t.replace(/\./g, "").replace(",", ".");
-  else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, "");
+  else if (/^-?\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, "");
   if (!/^-?\d+(\.\d+)?$/.test(t)) return null;
   return Number(t);
 }

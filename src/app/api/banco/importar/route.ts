@@ -3,6 +3,7 @@ import ExcelJS from "exceljs";
 import { obtenerUsuario } from "@/lib/auth";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { esNorma43, huella, leerCsv, leerHtml, leerNorma43, leerTabla, type Movimiento } from "@/lib/extracto-banco";
+// Generar documentos con Microsoft puede tardar: hasta 60 sexport const maxDuration = 60;
 
 // Sube el extracto del Santander (Norma 43, Excel .xlsx, CSV o el ".xls" en HTML) y guarda
 // los movimientos nuevos. Los que ya estaban (misma huella) no se repiten.
@@ -10,6 +11,7 @@ export async function POST(request: NextRequest) {
   await obtenerUsuario();
   const archivo = (await request.formData()).get("archivo");
   if (!(archivo instanceof File)) return NextResponse.json({ error: "Falta el archivo" }, { status: 400 });
+  if (archivo.size > 4 * 1024 * 1024) return NextResponse.json({ error: "El fichero pesa más de 4 MB: descarga menos meses" }, { status: 413 });
   const bytes = new Uint8Array(await archivo.arrayBuffer());
 
   let movimientos: Movimiento[];
@@ -33,9 +35,20 @@ export async function POST(request: NextRequest) {
   });
 
   const sb = await crearClienteServidor();
-  const { data, error } = await sb.from("movimientos_banco").upsert(filas, { onConflict: "huella", ignoreDuplicates: true }).select("id");
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  // El mismo movimiento subido antes en otro formato (Norma 43 / Excel) trae otro concepto:
+  // se reconoce por fecha + importe + saldo (o + concepto si el fichero no trae saldo)
   const fechas = movimientos.map((m) => m.fecha).sort();
+  const { data: previos, error: e1 } = await sb.from("movimientos_banco").select("fecha, importe, saldo, concepto")
+    .gte("fecha", fechas[0]).lte("fecha", fechas[fechas.length - 1]);
+  if (e1) return NextResponse.json({ error: e1.message }, { status: 500 });
+  const clave = (m: { fecha: string; importe: number; saldo: number | null; concepto: string }) =>
+    m.saldo !== null ? `${m.fecha}|${Number(m.importe).toFixed(2)}|${Number(m.saldo).toFixed(2)}` : huella({ ...m, fechaValor: null, referencia: null, importe: Number(m.importe) });
+  const yaEstan = new Set((previos ?? []).map((p) => clave({ ...p, saldo: p.saldo === null ? null : Number(p.saldo) })));
+  const nuevas = filas.filter((f) => !yaEstan.has(clave(f)));
+  const { data, error } = nuevas.length
+    ? await sb.from("movimientos_banco").upsert(nuevas, { onConflict: "huella", ignoreDuplicates: true }).select("id")
+    : { data: [], error: null };
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ leidos: movimientos.length, nuevos: data?.length ?? 0, desde: fechas[0], hasta: fechas[fechas.length - 1] });
 }
 

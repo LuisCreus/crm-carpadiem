@@ -3,6 +3,7 @@ import { extractText, getDocumentProxy } from "unpdf";
 import { obtenerUsuario } from "@/lib/auth";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { leerDatosFactura } from "@/lib/leer-factura";
+// Generar documentos con Microsoft puede tardar: hasta 60 sexport const maxDuration = 60;
 
 // Lee el texto de una factura en PDF y saca sus datos principales (no guarda nada).
 // Si el NIF o el IBAN coinciden con un proveedor guardado, lo devuelve también.
@@ -10,6 +11,7 @@ export async function POST(request: NextRequest) {
   await obtenerUsuario();
   const archivo = (await request.formData()).get("archivo");
   if (!(archivo instanceof File)) return NextResponse.json({ error: "Falta el archivo" }, { status: 400 });
+  if (archivo.size > 4 * 1024 * 1024) return NextResponse.json({ sinTexto: true, motivo: "grande" });
   if (!/pdf$/i.test(archivo.type) && !/\.pdf$/i.test(archivo.name)) return NextResponse.json({ sinTexto: true, motivo: "foto" });
 
   let texto = "";

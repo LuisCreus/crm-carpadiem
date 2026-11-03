@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { compartirPdf } from "@/lib/compartir";
 import { Copy, Mail, MessageCircle, Phone, Plus, Share2, Trash2 } from "lucide-react";
 import { EtiquetaEstado, Etiqueta, CLASE_CONFIRMADO, CLASE_SEGURO } from "@/components/etiqueta-estado";
 import { HistorialDialogo } from "@/components/historial-dialogo";
@@ -130,8 +131,9 @@ export function FichaPresupuesto({ id }: { id: string }) {
     const reservaTexto = reservaPct !== null ? ` · Reserva ${formatoPorcentaje(reservaPct)} = ${formatoEuros(importeReserva(valor, reservaPct))}` : "";
     if (!window.confirm(`Importe ${formatoEuros(valor)}${reservaTexto} — ¿Correcto?`)) return;
     const r1 = await sb.from("presupuestos").update({ importe: valor }).eq("id", p.id);
+    if (r1.error) return toast.error(r1.error.message);
     const r2 = await sb.from("presupuesto_versiones").update({ importe: valor }).eq("presupuesto_id", p.id).eq("version", ultimaVersion);
-    if (r1.error || r2.error) toast.error((r1.error ?? r2.error)!.message);
+    if (r2.error) toast.error(r2.error.message);
     else toast.success("Importe guardado ✓");
   }
 
@@ -353,17 +355,10 @@ export function FichaPresupuesto({ id }: { id: string }) {
 function AccionesMovil({ contacto, versionPdf }: { contacto?: Contacto; versionPdf?: Version }) {
   async function compartir() {
     if (!versionPdf) return;
-    try {
-      const r = await fetch(`/api/pdf/${versionPdf.id}`);
-      if (!r.ok) throw new Error("No se pudo descargar el PDF");
-      const nombre = (versionPdf.nombre_archivo ?? "presupuesto").replace(/\.docx$/i, "") + ".pdf";
-      const archivo = new File([await r.blob()], nombre.replace(/\.pdf\.pdf$/, ".pdf"), { type: "application/pdf" });
-      if (navigator.canShare?.({ files: [archivo] })) await navigator.share({ files: [archivo], title: archivo.name });
-      else window.open(`/api/pdf/${versionPdf.id}?ver=1`, "_blank");
-    } catch (e) {
-      if (e instanceof Error && e.name !== "AbortError") toast.error(e.message);
-    }
+    const nombre = (versionPdf.nombre_archivo ?? "presupuesto").replace(/\.(docx|pdf)$/i, "") + ".pdf";
+    await compartirPdf(`/api/pdf/${versionPdf.id}`, nombre);
   }
+
 
   const boton = "flex min-h-14 flex-1 flex-col items-center justify-center gap-1 rounded-xl border bg-card text-xs font-medium text-foreground";
   return (

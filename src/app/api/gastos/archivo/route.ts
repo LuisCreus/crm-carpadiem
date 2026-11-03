@@ -3,6 +3,7 @@ import { obtenerUsuario } from "@/lib/auth";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { asegurarCarpeta, descargar, elementoPorRuta, rutaReal, sharepointConfigurado, subir } from "@/lib/graph/sharepoint";
 import { limpiarNombre } from "@/lib/negocio";
+// Generar documentos con Microsoft puede tardar: hasta 60 sexport const maxDuration = 60;
 
 // Facturas que nos llegan: se guardan donde las dejáis para la gestoría
 const CARPETA_RECIBIDAS = "CARPA DIEM/03. FINANCIERO/01. FACTURAS/01. PENDIENTE SARA/02. RECIBIDAS";
@@ -22,6 +23,7 @@ export async function POST(request: NextRequest) {
   const punto = archivo.name.lastIndexOf(".");
   const base = limpiarNombre(punto > 0 ? archivo.name.slice(0, punto) : archivo.name) || "Factura";
   const extension = punto > 0 ? archivo.name.slice(punto).toLowerCase() : "";
+  if (!/^\.(pdf|png|jpe?g|heic|heif|webp)$/.test(extension)) return NextResponse.json({ error: "Solo PDF o fotos (jpg, png, heic)" }, { status: 400 });
   let nombre = `${base}${extension}`;
   for (let i = 2; await elementoPorRuta(`${carpeta}/${nombre}`); i++) nombre = `${base} (${i})${extension}`;
 

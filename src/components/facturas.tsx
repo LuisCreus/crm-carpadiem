@@ -4,6 +4,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
+import { compartirPdf } from "@/lib/compartir";
 import { Download, Mail, Share2 } from "lucide-react";
 import { Campo, claseSelect } from "@/components/campo";
 import { Etiqueta } from "@/components/etiqueta-estado";
@@ -249,17 +250,9 @@ export function AccionesFactura({ f, datos, editar }: { f: Factura; datos: Datos
   }
 
   async function compartir() {
-    try {
-      const resp = await fetch(`/api/factura/${f.id}`);
-      if (!resp.ok) throw new Error("No se pudo descargar el PDF");
-      const nombre = f.pdf_nombre ?? `FACTURA ${f.codigo}.pdf`;
-      const archivo = new File([await resp.blob()], nombre, { type: "application/pdf" });
-      if (navigator.canShare?.({ files: [archivo] })) await navigator.share({ files: [archivo], title: nombre });
-      else window.open(`/api/factura/${f.id}?ver=1`, "_blank");
-    } catch (e) {
-      if (e instanceof Error && e.name !== "AbortError") toast.error(e.message);
-    }
+    await compartirPdf(`/api/factura/${f.id}`, f.pdf_nombre ?? `FACTURA ${f.codigo}.pdf`);
   }
+
 
   async function pagar() {
     setOcupado(true);

@@ -20,6 +20,7 @@ import { moverAPapelera } from "@/lib/datos/papelera";
 import { uno } from "@/lib/datos/tipos";
 import { formatoFecha, hoyMadrid } from "@/lib/formato";
 import { cn } from "@/lib/utils";
+import { useUnaVez } from "@/hooks/use-una-vez";
 
 type EstadoLead = "por_contactar" | "contactado" | "interesado" | "presupuesto_enviado" | "ganado" | "perdido";
 
@@ -59,6 +60,7 @@ type Borrador = Omit<Lead, "id" | "orden_kanban" | "comercial"> & { id?: string 
 const hoy = () => hoyMadrid();
 
 export function TableroLeads({ nombreUsuario }: { nombreUsuario: string }) {
+  const { enCurso, unaVez } = useUnaVez();
   const listas = useListas();
   const { datos, cargando } = useTablaEnVivo<Lead>(["leads"], async (sb) => {
     const { data, error } = await sb.from("leads").select("*, comercial:comerciales(nombre)")
@@ -257,7 +259,7 @@ export function TableroLeads({ nombreUsuario }: { nombreUsuario: string }) {
             <DialogTitle>{editando?.id ? editando.cliente_nombre : "Lead rápido"}</DialogTitle>
           </DialogHeader>
           {editando && (
-            <form id="form-lead" onSubmit={guardar} className="grid gap-4 sm:grid-cols-2">
+            <form id="form-lead" onSubmit={unaVez(guardar)} className="grid gap-4 sm:grid-cols-2">
               <Campo id="l-cliente" etiqueta="Cliente" className="sm:col-span-2">
                 <Input id="l-cliente" required autoFocus={!editando.id} value={editando.cliente_nombre}
                   onChange={(e) => setEditando({ ...editando, cliente_nombre: e.target.value })} />
@@ -333,7 +335,7 @@ export function TableroLeads({ nombreUsuario }: { nombreUsuario: string }) {
               </>
             )}
             <Button variant="outline" onClick={() => setEditando(null)}>Cancelar</Button>
-            <Button type="submit" form="form-lead">Guardar</Button>
+            <Button type="submit" form="form-lead" disabled={enCurso}>Guardar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

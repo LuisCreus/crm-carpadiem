@@ -4,7 +4,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { crearClienteNavegador } from "@/lib/supabase/client";
 
 // Carga datos y los vuelve a cargar en cuanto alguien cambia algo en
-// cualquiera de las tablas indicadas (Supabase Realtime).
+// cualquiera de las tablas indicadas (Supabase Realtime), al volver a la app
+// (el móvil se bloquea y pierde la conexión) y al recuperar la conexión.
 export function useTablaEnVivo<T>(
   tablas: string[],
   cargar: (supabase: ReturnType<typeof crearClienteNavegador>) => Promise<T[]>,
@@ -18,16 +19,22 @@ export function useTablaEnVivo<T>(
     cargarRef.current = cargar;
   });
   const clave = tablas.join(",");
+  // Solo vale la respuesta de la última carga (una lenta no pisa a una más nueva)
+  const turno = useRef(0);
 
   const recargar = useCallback(async () => {
     const supabase = crearClienteNavegador();
+    const mio = ++turno.current;
     try {
-      setDatos(await cargarRef.current(supabase));
+      const nuevos = await cargarRef.current(supabase);
+      if (mio !== turno.current) return;
+      setDatos(nuevos);
       setError(null);
     } catch (e) {
+      if (mio !== turno.current) return;
       setError(e instanceof Error ? e.message : "Error al cargar los datos");
     } finally {
-      setCargando(false);
+      if (mio === turno.current) setCargando(false);
     }
   }, []);
 
@@ -44,10 +51,17 @@ export function useTablaEnVivo<T>(
         pendiente = setTimeout(() => void recargar(), 150);
       });
     }
-    canal.subscribe();
+    let primera = true;
+    canal.subscribe((s) => { if (s === "SUBSCRIBED") { if (!primera) void recargar(); primera = false; } });
+    const alVolver = () => { if (!document.hidden) void recargar(); };
+    const alConectar = () => void recargar();
+    document.addEventListener("visibilitychange", alVolver);
+    window.addEventListener("online", alConectar);
 
     return () => {
       clearTimeout(pendiente);
+      document.removeEventListener("visibilitychange", alVolver);
+      window.removeEventListener("online", alConectar);
       void supabase.removeChannel(canal);
     };
   }, [clave, recargar]);

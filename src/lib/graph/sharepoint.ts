@@ -29,6 +29,48 @@ export function rutaReal(ruta: string): string {
   return ruta.startsWith("CARPA DIEM/") ? `${raiz}/${ruta.slice("CARPA DIEM/".length)}` : ruta;
 }
 
+// ---------------------------------------------------------------------
+// Límites: el CRM solo toca lo que hay dentro de "CARPA DIEM" (nunca otras
+// carpetas del sitio), no escribe en los originales y no mueve ni borra
+// las carpetas principales. Así un id o una ruta manipulados no hacen daño.
+// ---------------------------------------------------------------------
+const CARPETA_CRM = "CARPA DIEM";
+const PROTEGIDOS = [/\/PRESU WORD _ CARPADIEM\.docx$/i, /\/PRESU WORD NEUTRO _ CARPADIEM \.docx$/i, /\/Cuentas_y_facturas_[^/]*\.xlsx$/i];
+
+export function comprobarRuta(ruta: string, escritura = false): string {
+  const partes = ruta.split("/");
+  if (partes[0] !== CARPETA_CRM || partes.length < 2 || partes.some((p) => !p.trim() || p === "." || p === "..")) {
+    throw new ErrorSharePoint(`Ruta fuera de ${CARPETA_CRM}: ${ruta}`, 403);
+  }
+  if (escritura && PROTEGIDOS.some((x) => x.test(ruta))) throw new ErrorSharePoint(`Ese archivo no se toca desde el CRM: ${ruta}`, 403);
+  return ruta;
+}
+
+const comprobarId = (id: string) => {
+  if (!/^[A-Za-z0-9!_-]+$/.test(id)) throw new ErrorSharePoint("Identificador de SharePoint no válido", 400);
+  return encodeURIComponent(id);
+};
+
+// Ruta completa de un elemento ("CARPA DIEM/01. CLIENTES/…/archivo.pdf") a partir de su id
+async function rutaDeId(id: string): Promise<string | null> {
+  const drive = await obtenerDrive();
+  const r = await graph(`/drives/${drive}/items/${comprobarId(id)}?$select=name,parentReference`);
+  if (r.status === 404) return null;
+  const e = (await r.json()) as Elemento;
+  const padre = decodeURIComponent((e.parentReference?.path ?? "").split("root:")[1] ?? "").replace(/^\/+/, "");
+  return padre ? `${padre}/${e.name}` : e.name;
+}
+
+// Para leer: el elemento tiene que estar dentro de CARPA DIEM. Para mover, renombrar, sustituir o
+// borrar, además a 3 niveles o más (nunca "01. CLIENTES" ni "03. FINANCIERO" enteras) y no un original.
+async function permitirId(id: string, escritura: boolean): Promise<string> {
+  const ruta = await rutaDeId(id);
+  if (ruta === null) throw new ErrorSharePoint("El archivo ya no está en SharePoint", 404);
+  comprobarRuta(ruta, escritura);
+  if (escritura && ruta.split("/").length < 4) throw new ErrorSharePoint(`Esa carpeta no se mueve ni se borra desde el CRM: ${ruta}`, 403);
+  return comprobarId(id);
+}
+
 export function rutaPlantilla(plantilla: "carpadiem" | "neutra"): string {
   const nombre = plantilla === "neutra" ? "PLANTILLA CRM NEUTRA _ CARPADIEM.docx" : "PLANTILLA CRM _ CARPADIEM.docx";
   return `${config().plantillas}/${nombre}`;
@@ -58,12 +100,18 @@ async function obtenerToken(): Promise<string> {
   return token.valor;
 }
 
-async function graph(ruta: string, init: RequestInit = {}): Promise<Response> {
+async function graph(ruta: string, init: RequestInit = {}, reintento = true): Promise<Response> {
   const r = await fetch(ruta.startsWith("http") ? ruta : `${GRAPH}${ruta}`, {
     ...init,
     headers: { Authorization: `Bearer ${await obtenerToken()}`, ...(init.headers ?? {}) },
     redirect: "follow",
+    signal: AbortSignal.timeout(30_000),
   });
+  // Token caducado o secreto renovado: se pide otro y se repite una vez
+  if (r.status === 401 && reintento) {
+    token = null;
+    return graph(ruta, init, false);
+  }
   if (!r.ok && r.status !== 404) {
     let detalle = "";
     try { detalle = (await r.clone().json()).error?.message ?? ""; } catch { /* sin cuerpo */ }
@@ -109,13 +157,16 @@ export type Elemento = {
 
 export async function elementoPorRuta(ruta: string): Promise<Elemento | null> {
   const drive = await obtenerDrive();
-  const r = await graph(`/drives/${drive}/root:/${codificar(ruta)}`);
+  const r = await graph(`/drives/${drive}/root:/${codificar(comprobarRuta(ruta))}`);
   return r.status === 404 ? null : ((await r.json()) as Elemento);
 }
 
 export async function elementoPorId(id: string): Promise<Elemento | null> {
   const drive = await obtenerDrive();
-  const r = await graph(`/drives/${drive}/items/${id}`);
+  const ruta = await rutaDeId(id);
+  if (ruta === null) return null;
+  comprobarRuta(ruta);
+  const r = await graph(`/drives/${drive}/items/${comprobarId(id)}`);
   return r.status === 404 ? null : ((await r.json()) as Elemento);
 }
 
@@ -123,9 +174,10 @@ export async function elementoPorId(id: string): Promise<Elemento | null> {
 export async function asegurarCarpeta(ruta: string): Promise<Elemento> {
   const existente = await elementoPorRuta(ruta);
   if (existente) return existente;
+  comprobarRuta(ruta, true);
   const partes = ruta.split("/");
   const nombre = partes.pop()!;
-  const padre = await asegurarCarpeta(partes.join("/"));
+  const padre = await crearOLeer(partes.join("/"));
   const drive = await obtenerDrive();
   const r = await graph(`/drives/${drive}/items/${padre.id}/children`, {
     method: "POST",
@@ -136,9 +188,20 @@ export async function asegurarCarpeta(ruta: string): Promise<Elemento> {
   return (await r.json()) as Elemento;
 }
 
+// Si dos personas crean la misma carpeta a la vez, la segunda recibe 409: se usa la que ya existe
+async function crearOLeer(ruta: string): Promise<Elemento> {
+  try {
+    return await asegurarCarpeta(ruta);
+  } catch (e) {
+    const ya = e instanceof ErrorSharePoint && e.estado === 409 ? await elementoPorRuta(ruta) : null;
+    if (ya) return ya;
+    throw e;
+  }
+}
+
 export async function descargar(id: string): Promise<Uint8Array> {
   const drive = await obtenerDrive();
-  const r = await graph(`/drives/${drive}/items/${id}/content`);
+  const r = await graph(`/drives/${drive}/items/${await permitirId(id, false)}/content`);
   if (r.status === 404) throw new ErrorSharePoint("El archivo ya no está en SharePoint");
   return new Uint8Array(await r.arrayBuffer());
 }
@@ -147,9 +210,10 @@ export async function descargar(id: string): Promise<Uint8Array> {
 // Justo después de subir un archivo, Microsoft a veces aún no puede convertirlo: se reintenta
 export async function descargarComoPdf(id: string, intentos = 4): Promise<Uint8Array> {
   const drive = await obtenerDrive();
+  const seguro = await permitirId(id, false);
   for (let i = 1; ; i++) {
     try {
-      const r = await graph(`/drives/${drive}/items/${id}/content?format=pdf`);
+      const r = await graph(`/drives/${drive}/items/${seguro}/content?format=pdf`);
       if (r.status === 404) {
         if (i < intentos) throw new ErrorSharePoint("Todavía no disponible", 404);
         throw new ErrorSharePoint("El archivo ya no está en SharePoint");
@@ -166,7 +230,7 @@ export async function descargarComoPdf(id: string, intentos = 4): Promise<Uint8A
 // Sube (o sustituye) un archivo en la ruta indicada
 export async function subir(ruta: string, contenido: Uint8Array, tipo: string): Promise<Elemento> {
   const drive = await obtenerDrive();
-  const r = await graph(`/drives/${drive}/root:/${codificar(ruta)}:/content`, {
+  const r = await graph(`/drives/${drive}/root:/${codificar(comprobarRuta(ruta, true))}:/content`, {
     method: "PUT",
     headers: { "Content-Type": tipo },
     body: contenido as unknown as BodyInit,
@@ -178,8 +242,10 @@ export async function subir(ruta: string, contenido: Uint8Array, tipo: string): 
 export async function moverRenombrar(id: string, carpetaDestino: string | null, nombreNuevo: string): Promise<Elemento> {
   const drive = await obtenerDrive();
   const cuerpo: Record<string, unknown> = { name: nombreNuevo };
-  if (carpetaDestino) cuerpo.parentReference = { id: (await asegurarCarpeta(carpetaDestino)).id };
-  const r = await graph(`/drives/${drive}/items/${id}`, {
+  if (/[/\\]/.test(nombreNuevo) || nombreNuevo === "." || nombreNuevo === "..") throw new ErrorSharePoint("Nombre no válido", 400);
+  const seguro = await permitirId(id, true);
+  if (carpetaDestino) cuerpo.parentReference = { id: (await crearOLeer(comprobarRuta(carpetaDestino, true))).id };
+  const r = await graph(`/drives/${drive}/items/${seguro}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(cuerpo),
@@ -205,7 +271,7 @@ export async function listarCarpeta(ruta: string): Promise<{ id: string; name: s
 // Borra un archivo (va a la papelera de reciclaje de SharePoint)
 export async function eliminarElemento(id: string): Promise<void> {
   const drive = await obtenerDrive();
-  await graph(`/drives/${drive}/items/${id}`, { method: "DELETE" });
+  await graph(`/drives/${drive}/items/${await permitirId(id, true)}`, { method: "DELETE" });
 }
 
 export const TIPO_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -217,7 +283,7 @@ export function rutaCopias(): string {
 // Sustituye el contenido de un archivo que ya existe (aunque lo hayan movido de carpeta)
 export async function reemplazarContenido(id: string, contenido: Uint8Array, tipo: string): Promise<Elemento> {
   const drive = await obtenerDrive();
-  const r = await graph(`/drives/${drive}/items/${id}/content`, {
+  const r = await graph(`/drives/${drive}/items/${await permitirId(id, true)}/content`, {
     method: "PUT",
     headers: { "Content-Type": tipo },
     body: contenido as unknown as BodyInit,

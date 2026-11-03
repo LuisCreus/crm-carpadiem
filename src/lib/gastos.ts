@@ -1,6 +1,6 @@
 // Cálculos de las facturas recibidas (gastos), sin base de datos.
 
-const redondear = (n: number) => Math.round(n * 100) / 100;
+const redondear = (n: number) => Math.round((n + Math.sign(n) * Number.EPSILON) * 100 * (1 + Number.EPSILON)) / 100;
 
 // Igual que en la base de datos: base + IVA − retención de IRPF
 export function totalRecibida(base: number, ivaPct: number, irpfPct: number): number {

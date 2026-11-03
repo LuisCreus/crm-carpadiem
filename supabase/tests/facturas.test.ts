@@ -130,7 +130,7 @@ describe("emitir y cobrar", () => {
     await como(() => db.query("select public.emitir_factura($1)", [reserva.id]));
     await expect(como(() => db.query("select public.papelera_mover('facturas', $1)", [reserva.id]))).rejects.toThrow(/no se puede borrar/);
     await expect(como(() => db.query("update public.facturas set importe = 1 where id = $1", [reserva.id]))).rejects.toThrow(/no se puede cambiar/);
-    await expect(como(() => db.query("update public.facturas set numero = 99 where id = $1", [reserva.id]))).rejects.toThrow(/permission denied/);
+    await expect(como(() => db.query("update public.facturas set numero = 99 where id = $1", [reserva.id]))).rejects.toThrow(/permission denied|solo se cambian/);
   });
 
   it("al emitir la reserva por otro importe, el resto se recalcula", async () => {
@@ -140,5 +140,27 @@ describe("emitir y cobrar", () => {
     await como(() => db.query("update public.facturas set importe = 2000 where id = $1", [reserva.id]));
     await como(() => db.query("select public.emitir_factura($1)", [reserva.id]));
     expect((await facturas(a.eventoId)).map((f) => [f.tipo, f.importe, f.estado])).toEqual([["reserva", "2000.00", "emitida"], ["resto", "8000.00", "prevista"]]);
+  });
+
+  it("un cobro apuntado a mano no se duplica al marcar pagada su factura, y no se borra suelto", async () => {
+    const a = await presupuestoAceptado(10000, 30);
+    await datosFiscales(a.clienteId);
+    const reserva = (await facturas(a.eventoId)).find((f) => f.tipo === "reserva")!;
+    await como(() => db.query("insert into public.cobros (presupuesto_id, fecha, importe, concepto) values ($1, '2026-11-01', 3000, 'reserva')", [a.presupuestoId]));
+    await como(() => db.query("select public.emitir_factura($1)", [reserva.id]));
+    await como(() => db.query("select public.marcar_factura_pagada($1, '2026-11-02')", [reserva.id]));
+    const cobros = await db.query<{ id: string }>("select id from public.cobros where presupuesto_id = $1 and deleted_at is null", [a.presupuestoId]);
+    expect(cobros.rows).toHaveLength(1);
+    await expect(como(() => db.query("select public.papelera_mover('cobros', $1)", [cobros.rows[0].id]))).rejects.toThrow(/desmárcala/);
+    await como(() => db.query("select public.desmarcar_factura_pagada($1)", [reserva.id]));
+    expect((await db.query("select 1 from public.cobros where presupuesto_id = $1 and deleted_at is null", [a.presupuestoId])).rows).toHaveLength(0);
+  });
+
+  it("un presupuesto con facturas emitidas no vuelve a pendiente", async () => {
+    const a = await presupuestoAceptado(10000, 30);
+    await datosFiscales(a.clienteId);
+    const reserva = (await facturas(a.eventoId)).find((f) => f.tipo === "reserva")!;
+    await como(() => db.query("select public.emitir_factura($1)", [reserva.id]));
+    await expect(como(() => db.query("update public.presupuestos set estado = 'pendiente' where id = $1", [a.presupuestoId]))).rejects.toThrow(/facturas emitidas/);
   });
 });

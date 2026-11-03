@@ -42,3 +42,14 @@ describe("conciliación con el banco", () => {
     expect(patronSugerido("COMPRA TARJETA 4471 REPSOL ESTACION")).toBe("REPSOL ESTACION");
   });
 });
+
+describe("revisión: casos límite", () => {
+  it("«CD 2026/50» no se confunde con la 2026/5", () => {
+    const fs: EmitidaC[] = [
+      { id: "e5", codigo: "CD 2026/5", anio: 2026, numero: 5, total: 121, estado: "emitida", cliente: "A" },
+      { id: "e50", codigo: "CD 2026/50", anio: 2026, numero: 50, total: 121, estado: "pagada", cliente: "B" },
+    ];
+    expect(proponer({ id: "m", fecha: "2026-11-01", concepto: "TRANSF CD 2026/50", importe: 121 }, fs, [], [])).toMatchObject({ factura: { id: "e50" } });
+    expect(proponer({ id: "m", fecha: "2026-11-01", concepto: "Pago Fra. Cd2026/5", importe: 121 }, fs, [], [])).toMatchObject({ factura: { id: "e5" }, seguro: true });
+  });
+});

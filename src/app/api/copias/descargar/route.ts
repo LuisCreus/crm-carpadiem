@@ -3,6 +3,7 @@ import { exigirAdmin } from "@/lib/auth";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { cargarDatosCopia } from "@/lib/copias-servidor";
 import { generarExcelCopia, nombreCopia } from "@/lib/copias";
+// Generar documentos con Microsoft puede tardar: hasta 60 sexport const maxDuration = 60;
 
 // "Descargar copia" (solo administrador): el mismo Excel, directamente al ordenador
 export async function GET() {

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { obtenerUsuario } from "@/lib/auth";
 import { FormularioPresupuesto } from "./formulario-presupuesto";
+// Generar documentos con Microsoft puede tardar: hasta 60 sexport const maxDuration = 60;
 
 export const metadata: Metadata = { title: "Nuevo presupuesto" };
 

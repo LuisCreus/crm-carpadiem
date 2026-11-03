@@ -100,6 +100,7 @@ export function AjustesAdmin({ miId }: { miId: string }) {
     }
     const ok = await guardar(supabase.from("numeracion_anual").insert({ anio, numero_inicial: 1 }));
     if (ok) setNuevoAnio("");
+    void numeracion.recargar(); // esta tabla no avisa de cambios en vivo
   }
 
   return (
@@ -187,7 +188,7 @@ export function AjustesAdmin({ miId }: { miId: string }) {
                   onBlur={(e) => {
                     const valor = Number(e.target.value);
                     if (valor > 0 && valor !== n.numero_inicial) {
-                      void guardar(supabase.from("numeracion_anual").update({ numero_inicial: valor }).eq("anio", n.anio));
+                      void guardar(supabase.from("numeracion_anual").update({ numero_inicial: valor }).eq("anio", n.anio)).then(() => numeracion.recargar());
                     }
                   }}
                 />

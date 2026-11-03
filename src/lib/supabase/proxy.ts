@@ -31,7 +31,8 @@ export async function actualizarSesion(request: NextRequest) {
   );
 
   const { data } = await supabase.auth.getClaims();
-  const esPublica = RUTAS_PUBLICAS.some((r) => request.nextUrl.pathname.startsWith(r));
+  const ruta = request.nextUrl.pathname;
+  const esPublica = RUTAS_PUBLICAS.some((r) => ruta === r || ruta.startsWith(`${r}/`));
 
   if (!data?.claims && !esPublica) {
     const url = request.nextUrl.clone();

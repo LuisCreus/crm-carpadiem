@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -24,7 +24,6 @@ export function BusquedaGlobal() {
   const [texto, setTexto] = useState("");
   const [indice, setIndice] = useState<Resultado[]>([]);
   const [activo, setActivo] = useState(0);
-  const cargado = useRef(false);
 
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => {
@@ -44,8 +43,7 @@ export function BusquedaGlobal() {
   }, []);
 
   useEffect(() => {
-    if (!abierto || cargado.current) return;
-    cargado.current = true;
+    if (!abierto) return; // se recarga cada vez que se abre: así salen también los recién creados
     const sb = crearClienteNavegador();
     void Promise.all([
       sb.from("presupuestos").select("id, codigo, fecha_precision, fecha_evento, fecha_fin, ubicacion, provincia, material, cliente:clientes(nombre), intermediario:intermediarios(nombre)").is("deleted_at", null).order("numero", { ascending: false }),
@@ -93,7 +91,7 @@ export function BusquedaGlobal() {
 
   return (
     <>
-      <Dialog open={abierto} onOpenChange={(a) => { setAbierto(a); if (!a) cargado.current = false; }}>
+      <Dialog open={abierto} onOpenChange={setAbierto}>
         <DialogContent className="top-[12dvh] translate-y-0 gap-0 p-0 sm:max-w-xl" showCloseButton={false}>
           <DialogTitle className="sr-only">Buscar</DialogTitle>
           <div className="flex items-center gap-2 border-b px-4">

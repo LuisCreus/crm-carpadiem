@@ -12,7 +12,7 @@ export function useEventos() {
       sb.from("eventos").select(SELECT_EVENTO).is("deleted_at", null).order("fecha_inicio", { nullsFirst: false }),
       sb.from("cobros").select("presupuesto_id, importe").is("deleted_at", null),
     ]);
-    if (ev.error) throw new Error(ev.error.message);
+    if (ev.error || co.error) throw new Error((ev.error ?? co.error)!.message);
     const cobrado = new Map<string, number>();
     for (const c of co.data ?? []) {
       cobrado.set(c.presupuesto_id, (cobrado.get(c.presupuesto_id) ?? 0) + Number(c.importe));

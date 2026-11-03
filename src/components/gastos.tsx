@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { nombreDe, useListas } from "@/hooks/use-listas";
-import { useTablaEnVivo } from "@/hooks/use-tabla-en-vivo";
+import { useCompartido } from "@/hooks/use-compartido";
 import { crearClienteNavegador } from "@/lib/supabase/client";
 import { moverAPapelera } from "@/lib/datos/papelera";
 import { uno, type FacturaRecibida, type Proveedor } from "@/lib/datos/tipos";
@@ -23,28 +23,31 @@ import { formatoEuros, formatoFecha, hoyMadrid, leerEuros } from "@/lib/formato"
 import { totalRecibida } from "@/lib/gastos";
 import { formatoIban, type DatosLeidos } from "@/lib/leer-factura";
 import { eventosCercanos } from "@/lib/emparejamiento";
+import { useUnaVez } from "@/hooks/use-una-vez";
 
 type EventoOpcion = { id: string; texto: string; fecha_inicio: string | null; estado: string };
 
 // Eventos para elegir a cuál va el gasto (los más recientes primero)
 export function useEventosOpciones() {
-  const { datos } = useTablaEnVivo<EventoOpcion>(["eventos", "clientes"], async (sb) => {
-    const { data } = await sb.from("eventos").select("id, fecha_inicio, estado, cliente:clientes(nombre)")
+  const { datos } = useCompartido<EventoOpcion[]>("eventos-opciones", ["eventos", "clientes"], async (sb) => {
+    const { data, error } = await sb.from("eventos").select("id, fecha_inicio, estado, cliente:clientes(nombre)")
       .is("deleted_at", null).order("fecha_inicio", { ascending: false, nullsFirst: false });
+    if (error) throw new Error(error.message);
     return (data ?? []).map((e) => ({
       id: e.id, fecha_inicio: e.fecha_inicio, estado: e.estado,
       texto: `${e.fecha_inicio ? formatoFecha(e.fecha_inicio) : "Sin fecha"} · ${(uno(e.cliente) as { nombre: string } | null)?.nombre ?? "Evento"}`,
     }));
   });
-  return datos;
+  return datos ?? [];
 }
 
 export function useProveedores() {
-  const { datos } = useTablaEnVivo<Proveedor>(["proveedores"], async (sb) => {
-    const { data } = await sb.from("proveedores").select("id, nombre, nif, iban, email, categoria").is("deleted_at", null).order("nombre");
+  const { datos } = useCompartido<Proveedor[]>("proveedores", ["proveedores"], async (sb) => {
+    const { data, error } = await sb.from("proveedores").select("id, nombre, nif, iban, email, categoria").is("deleted_at", null).order("nombre");
+    if (error) throw new Error(error.message);
     return (data ?? []) as Proveedor[];
   });
-  return datos;
+  return datos ?? [];
 }
 
 export function EtiquetaGasto({ g, hoy }: { g: Pick<FacturaRecibida, "estado" | "vencimiento" | "fichero_pago_at">; hoy: string }) {
@@ -304,6 +307,7 @@ function Copiar({ texto, etiqueta }: { texto: string; etiqueta: string }) {
 export function LineaGasto({ g, mostrarEvento = true, seleccion }: {
   g: FacturaRecibida; mostrarEvento?: boolean; seleccion?: { marcada: boolean; cambiar: () => void };
 }) {
+  const { enCurso, unaVez } = useUnaVez();
   const listas = useListas();
   const hoy = hoyMadrid();
   const [dialogo, setDialogo] = useState<"editar" | "pagar" | null>(null);
@@ -393,7 +397,7 @@ export function LineaGasto({ g, mostrarEvento = true, seleccion }: {
           </Campo>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogo(null)}>Cancelar</Button>
-            <Button disabled={!fechaPago} onClick={pagar}>Marcar pagada</Button>
+            <Button disabled={!fechaPago || enCurso} onClick={unaVez(pagar)}>Marcar pagada</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

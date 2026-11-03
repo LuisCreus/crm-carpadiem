@@ -46,7 +46,8 @@ export function rentabilidadEvento(e: EventoRentabilidad, gastos: GastoRentabili
 export type Mes = { clave: string; ingresos: number; gastos: number; margen: number; eventos: number };
 
 // Mes a mes de un año (clave "aaaa-mm"; "sin-fecha" para los eventos sin fecha)
-export function resumenMensual(anio: number, eventos: EventoRentabilidad[], gastos: GastoRentabilidad[], facturas: FacturaRentabilidad[]): Mes[] {
+export function resumenMensual(anio: number, eventos: EventoRentabilidad[], gastos: GastoRentabilidad[], facturas: FacturaRentabilidad[],
+  anioActual = Number(new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" }).slice(0, 4))): Mes[] {
   const meses = new Map<string, Mes>();
   const mes = (clave: string) => {
     if (!meses.has(clave)) meses.set(clave, { clave, ingresos: 0, gastos: 0, margen: 0, eventos: 0 });
@@ -66,6 +67,8 @@ export function resumenMensual(anio: number, eventos: EventoRentabilidad[], gast
     }
     const clave = e.fecha_precision === "por_definir" || !e.fecha_inicio ? "sin-fecha" : e.fecha_inicio.slice(0, 7);
     if (clave !== "sin-fecha" && !clave.startsWith(String(anio))) continue;
+    // Los eventos sin fecha cerrada se cuentan solo en el año en curso (no en todos)
+    if (clave === "sin-fecha" && anio !== anioActual) continue;
     const r = rentabilidadEvento(e, gastos, facturas);
     const m = mes(clave);
     m.ingresos += r.ingresos;

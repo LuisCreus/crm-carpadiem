@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { compartirPdf } from "@/lib/compartir";
 import { Download, ExternalLink, FileText, FolderOpen, Link2, Share2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -132,17 +133,9 @@ export function TarjetaDocumento({ p, versiones }: { p: Presupuesto; versiones: 
   }
 
   async function compartir(v: Version) {
-    try {
-      const r = await fetch(`/api/pdf/${v.id}`);
-      if (!r.ok) throw new Error("No se pudo descargar el PDF");
-      const nombre = (v.nombre_archivo ?? `presupuesto ${vv(v.version)}`).replace(/\.docx$/i, ".pdf");
-      const archivo = new File([await r.blob()], nombre, { type: "application/pdf" });
-      if (navigator.canShare?.({ files: [archivo] })) await navigator.share({ files: [archivo], title: nombre });
-      else window.open(`/api/pdf/${v.id}`, "_blank");
-    } catch (e) {
-      if (e instanceof Error && e.name !== "AbortError") toast.error(e.message);
-    }
+    await compartirPdf(`/api/pdf/${v.id}`, (v.nombre_archivo ?? `presupuesto ${vv(v.version)}`).replace(/\.docx$/i, ".pdf"));
   }
+
 
   // Los importados conservan el nombre que ya tenían en SharePoint
   const nombreUltima = ultima?.nombre_archivo?.replace(/\.(docx|pdf)$/i, "")

@@ -15,7 +15,7 @@ export const ESTADOS_FACTURA: Record<EstadoFactura, { texto: string; clase: stri
   pagada: { texto: "Pagada", clase: "bg-[#E8F4EC] text-[#25683D]" },
 };
 
-const redondear = (n: number) => Math.round(n * 100) / 100;
+const redondear = (n: number) => Math.round((n + Math.sign(n) * Number.EPSILON) * 100 * (1 + Number.EPSILON)) / 100;
 
 // Base + IVA + suplidos, como en la hoja "Emitir"
 export function totalFactura(f: Pick<Factura, "importe" | "iva_pct" | "suplidos">) {
