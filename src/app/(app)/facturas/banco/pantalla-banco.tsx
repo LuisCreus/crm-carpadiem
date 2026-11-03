@@ -2,7 +2,8 @@
 
 import { useMemo, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
-import { Upload } from "lucide-react";
+import { Paperclip, Upload } from "lucide-react";
+import { Autocompletar } from "@/components/autocompletar";
 import { Cabecera } from "@/components/cabecera";
 import { Campo, claseSelect } from "@/components/campo";
 import { EstadoVacio } from "@/components/estado-vacio";
@@ -13,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { nombreDe, useListas } from "@/hooks/use-listas";
 import { useTablaEnVivo } from "@/hooks/use-tabla-en-vivo";
+import type { DatosLeidos } from "@/lib/leer-factura";
 import { patronSugerido, proponer, type EmitidaC, type Propuesta, type RecibidaC, type ReglaC } from "@/lib/conciliacion";
 import { SELECT_FACTURA_RECIBIDA, aFacturaRecibida, uno } from "@/lib/datos/tipos";
 import { totalFactura } from "@/lib/facturacion";
@@ -216,7 +218,7 @@ export function PantallaBanco() {
                       ? <Propuesto seguro texto="Regla: se ignora" confirmar={() => cambiarEstado(m, "ignorado")} />
                       : <Propuesto seguro texto={nombreDe(listas.categoriasGasto, regla.categoria)} accion="Apuntar" confirmar={() => setGasto({ m, regla })} />)}
                     <Button size="sm" variant="outline" onClick={() => setEnlazar(m)}>Elegir factura</Button>
-                    {m.importe < 0 && !regla && <Button size="sm" variant="outline" onClick={() => setGasto({ m })}>Apuntar gasto</Button>}
+                    {m.importe < 0 && <Button size="sm" variant="outline" onClick={() => setGasto({ m, regla })}>Apuntar factura o gasto</Button>}
                     <Button size="sm" variant="ghost" onClick={() => cambiarEstado(m, "ignorado")}>Ignorar</Button>
                   </div>
                 ) : (
@@ -293,46 +295,105 @@ function DialogoEnlazar({ m, emitidas, recibidas, usadas, cerrar, elegir }: {
   );
 }
 
-// Un cargo sin factura en el CRM (recibos, tarjeta…) se apunta como gasto ya pagado
+
+// Un cargo se apunta como factura recibida ya pagada: con su PDF (se leen sus datos y se guarda
+// en PENDIENTE SARA/02. RECIBIDAS) o, si no hay factura (recibos, tarjeta…), como gasto sin más.
 function DialogoGastoBanco({ m, regla, cerrar }: { m: { id: string; fecha: string; concepto: string; importe: number }; regla?: ReglaC; cerrar: () => void }) {
   const listas = useListas();
   const proveedores = useProveedores();
   const eventos = useEventosOpciones();
+  const archivoRef = useRef<HTMLInputElement>(null);
+  const [archivo, setArchivo] = useState<File | null>(null);
+  const [leyendo, setLeyendo] = useState(false);
   const [c, setC] = useState({
+    proveedor: proveedores.find((p) => p.id === regla?.proveedor_id)?.nombre ?? "",
+    nif: "",
+    numero: "",
+    fecha: m.fecha,
     concepto: m.concepto,
     categoria: regla?.categoria ?? "",
-    proveedor: regla?.proveedor_id ?? "",
     evento: "",
-    iva: "21",
+    iva: "0",
+    irpf: "0",
     recordar: !regla,
     patron: patronSugerido(m.concepto),
   });
   const set = <K extends keyof typeof c>(k: K, v: (typeof c)[K]) => setC((x) => ({ ...x, [k]: v }));
   const [guardando, setGuardando] = useState(false);
+  const existente = proveedores.find((p) => p.nombre.trim().toLowerCase() === c.proveedor.trim().toLowerCase());
   const total = Math.abs(m.importe);
-  const base = Math.round(total / (1 + (Number(c.iva) || 0) / 100) * 100) / 100;
+  const base = Math.round(total / (1 + (Number(c.iva) || 0) / 100 - (Number(c.irpf) || 0) / 100) * 100) / 100;
   const tipo = c.evento ? "variable" : "fijo";
   const categorias = listas.categoriasGasto.filter((x) => x.tipo === tipo || x.codigo === c.categoria);
+
+  // Al adjuntar el PDF se leen proveedor, nº, fecha e impuestos
+  async function adjuntar(nuevo: File | null) {
+    setArchivo(nuevo);
+    if (!nuevo || !/\.pdf$/i.test(nuevo.name)) return;
+    setLeyendo(true);
+    try {
+      const datos = new FormData();
+      datos.append("archivo", nuevo);
+      const r = await fetch("/api/gastos/leer", { method: "POST", body: datos });
+      const j = (await r.json()) as { sinTexto?: boolean; datos?: DatosLeidos; proveedor?: { nombre: string; nif: string | null; categoria: string | null } | null };
+      if (!r.ok || j.sinTexto || !j.datos) return toast.info("No se pueden leer los datos de este PDF: rellénalos a mano.");
+      const d = j.datos, p = j.proveedor;
+      setC((x) => ({
+        ...x,
+        proveedor: p?.nombre ?? x.proveedor,
+        nif: d.nif ?? p?.nif ?? x.nif,
+        numero: d.numero ?? x.numero,
+        fecha: d.fecha ?? x.fecha,
+        categoria: x.categoria || p?.categoria || "",
+        iva: d.ivaPct !== null ? String(d.ivaPct) : x.iva,
+        irpf: d.irpfPct !== null ? String(d.irpfPct) : x.irpf,
+        concepto: d.numero ? `Factura ${d.numero}` : x.concepto,
+      }));
+      if (d.total !== null && Math.abs(d.total - total) >= 0.01) toast.warning(`La factura dice ${formatoEuros(d.total)} y el banco ${formatoEuros(total)}: revísalo.`, { duration: 8000 });
+      else toast.success(p ? `Proveedor reconocido: ${p.nombre}` : "Datos leídos: revísalos");
+    } catch {
+      toast.info("No he podido leer el PDF: rellena los datos a mano.");
+    } finally {
+      setLeyendo(false);
+    }
+  }
 
   async function guardar(e: FormEvent) {
     e.preventDefault();
     if (!c.categoria) return toast.error("Elige la categoría");
+    if (archivo && archivo.size > 4 * 1024 * 1024) return toast.error("El archivo pesa más de 4 MB");
     setGuardando(true);
     try {
       const sb = crearClienteNavegador();
+      let subido: { id: string; url: string; nombre: string } | null = null;
+      if (archivo) {
+        const datos = new FormData();
+        datos.append("archivo", archivo);
+        const r = await fetch("/api/gastos/archivo", { method: "POST", body: datos });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error ?? "No se pudo subir el archivo");
+        subido = j;
+      }
+      let proveedorId = existente?.id ?? null;
+      if (!existente && c.proveedor.trim()) {
+        const p = await sb.from("proveedores").insert({ nombre: c.proveedor.trim(), nif: c.nif.replace(/\s/g, "").toUpperCase() || null, categoria: c.categoria }).select("id").single();
+        if (p.error) throw new Error(p.error.message);
+        proveedorId = p.data.id;
+      }
       const r = await sb.from("facturas_recibidas").insert({
-        proveedor_id: c.proveedor || null, fecha: m.fecha, concepto: c.concepto.trim() || null, evento_id: c.evento || null,
-        categoria: c.categoria, base, iva_pct: Number(c.iva) || 0, irpf_pct: 0,
-        estado: "pagada", fecha_pago: m.fecha, comentarios: "Desde el banco",
+        proveedor_id: proveedorId, numero: c.numero.trim() || null, fecha: c.fecha, concepto: c.concepto.trim() || null, evento_id: c.evento || null,
+        categoria: c.categoria, base, iva_pct: Number(c.iva) || 0, irpf_pct: Number(c.irpf) || 0,
+        estado: "pagada", fecha_pago: m.fecha, comentarios: subido ? "Conciliada con el banco" : "Desde el banco (sin factura)",
+        ...(subido ? { archivo_item_id: subido.id, archivo_url: subido.url, archivo_nombre: subido.nombre } : {}),
       }).select("id").single();
       if (r.error) throw new Error(r.error.message);
       const u = await sb.from("movimientos_banco").update({ estado: "conciliado", factura_recibida_id: r.data.id }).eq("id", m.id);
       if (u.error) throw new Error(u.error.message);
       if (c.recordar && c.patron.trim()) {
-        const g = await sb.from("reglas_banco").insert({ patron: c.patron.trim(), categoria: c.categoria, proveedor_id: c.proveedor || null });
+        const g = await sb.from("reglas_banco").insert({ patron: c.patron.trim(), categoria: c.categoria, proveedor_id: proveedorId });
         if (g.error) throw new Error(g.error.message);
       }
-      toast.success(c.recordar && c.patron.trim() ? `Apuntado ✓ · La próxima vez que aparezca "${c.patron.trim()}" te lo propongo` : "Apuntado ✓");
+      toast.success(subido ? `Apuntada ✓ · ${subido.nombre} en PENDIENTE SARA/02. RECIBIDAS` : "Apuntado ✓");
       cerrar();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "No se pudo guardar");
@@ -345,10 +406,33 @@ function DialogoGastoBanco({ m, regla, cerrar }: { m: { id: string; fecha: strin
     <Dialog open onOpenChange={(a) => !a && cerrar()}>
       <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Apuntar como gasto</DialogTitle>
+          <DialogTitle>Apuntar factura o gasto</DialogTitle>
           <DialogDescription>{formatoFecha(m.fecha)} · {formatoEuros(total)} · queda como pagado</DialogDescription>
         </DialogHeader>
         <form onSubmit={guardar} className="grid gap-3">
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed p-3 text-sm">
+            <input ref={archivoRef} type="file" accept=".pdf,image/*" className="hidden" onChange={(e) => void adjuntar(e.target.files?.[0] ?? null)} />
+            {archivo
+              ? <><Paperclip className="size-4" aria-hidden /><span className="min-w-0 flex-1 truncate">{archivo.name}</span>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => { setArchivo(null); if (archivoRef.current) archivoRef.current.value = ""; }}>Quitar</Button></>
+              : <><span className="flex-1 text-muted-foreground">¿Tienes la factura? Adjúntala y leo sus datos.</span>
+                  <Button type="button" size="sm" variant="outline" disabled={leyendo} onClick={() => archivoRef.current?.click()}>
+                    <Paperclip className="size-4" aria-hidden /> Adjuntar PDF
+                  </Button></>}
+            {leyendo && <span className="w-full text-xs text-muted-foreground">Leyendo la factura…</span>}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Campo id="gb-proveedor" etiqueta="Proveedor (opcional)">
+              <Autocompletar id="gb-proveedor" valor={c.proveedor} placeholder="Escribe el nombre…"
+                onTexto={(t) => set("proveedor", t)}
+                onElegir={(s) => { const p = proveedores.find((x) => x.id === s.id); if (p) setC((x) => ({ ...x, proveedor: p.nombre, categoria: x.categoria || p.categoria || "" })); }}
+                sugerencias={proveedores.map((p) => ({ id: p.id, texto: p.nombre, detalle: p.nif ?? undefined }))} />
+              {c.proveedor.trim() && !existente && <span className="text-xs text-muted-foreground">Proveedor nuevo: se guarda en Contactos.</span>}
+            </Campo>
+            <Campo id="gb-numero" etiqueta="Nº de factura">
+              <Input id="gb-numero" value={c.numero} onChange={(e) => set("numero", e.target.value)} placeholder="Vacío si es un tique" />
+            </Campo>
+          </div>
           <Campo id="gb-concepto" etiqueta="Concepto">
             <Input id="gb-concepto" value={c.concepto} onChange={(e) => set("concepto", e.target.value)} />
           </Campo>
@@ -365,19 +449,25 @@ function DialogoGastoBanco({ m, regla, cerrar }: { m: { id: string; fecha: strin
                 {categorias.map((x) => <option key={x.codigo} value={x.codigo}>{x.nombre}</option>)}
               </select>
             </Campo>
-            <Campo id="gb-proveedor" etiqueta="Proveedor (opcional)">
-              <select id="gb-proveedor" className={claseSelect} value={c.proveedor} onChange={(e) => set("proveedor", e.target.value)}>
-                <option value="">—</option>
-                {proveedores.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-              </select>
+            <Campo id="gb-fecha" etiqueta="Fecha de la factura">
+              <Input id="gb-fecha" type="date" value={c.fecha} onChange={(e) => set("fecha", e.target.value)} />
             </Campo>
-            <Campo id="gb-iva" etiqueta="IVA incluido">
-              <select id="gb-iva" className={claseSelect} value={c.iva} onChange={(e) => set("iva", e.target.value)}>
-                {["21", "10", "4", "0"].map((v) => <option key={v} value={v}>{v} %</option>)}
-              </select>
-            </Campo>
+            <div className="grid grid-cols-2 gap-3">
+              <Campo id="gb-iva" etiqueta="IVA">
+                <select id="gb-iva" className={claseSelect} value={c.iva} onChange={(e) => set("iva", e.target.value)}>
+                  {["21", "10", "4", "0"].map((v) => <option key={v} value={v}>{v} %</option>)}
+                </select>
+              </Campo>
+              <Campo id="gb-irpf" etiqueta="IRPF">
+                <select id="gb-irpf" className={claseSelect} value={c.irpf} onChange={(e) => set("irpf", e.target.value)}>
+                  {["0", "7", "15", "19"].map((v) => <option key={v} value={v}>{v} %</option>)}
+                </select>
+              </Campo>
+            </div>
           </div>
-          <p className="text-xs text-muted-foreground">Base {formatoEuros(base)} + IVA {formatoEuros(Math.round((total - base) * 100) / 100)} = {formatoEuros(total)}</p>
+          <p className="text-xs text-muted-foreground">
+            Base {formatoEuros(base)} → total {formatoEuros(total)}. Sin factura (tiques, recibos), deja el IVA a 0 %.
+          </p>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" className="size-4" checked={c.recordar} onChange={(e) => set("recordar", e.target.checked)} />
             Recordar: lo que lleve este texto en el concepto, proponerlo así
@@ -387,7 +477,7 @@ function DialogoGastoBanco({ m, regla, cerrar }: { m: { id: string; fecha: strin
           )}
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={cerrar}>Cancelar</Button>
-            <Button type="submit" disabled={guardando}>{guardando ? "Guardando…" : "Apuntar"}</Button>
+            <Button type="submit" disabled={guardando || leyendo}>{guardando ? "Guardando…" : "Apuntar"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
