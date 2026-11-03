@@ -22,16 +22,17 @@ import { uno, type FacturaRecibida, type Proveedor } from "@/lib/datos/tipos";
 import { formatoEuros, formatoFecha, hoyMadrid, leerEuros } from "@/lib/formato";
 import { totalRecibida } from "@/lib/gastos";
 import { formatoIban, type DatosLeidos } from "@/lib/leer-factura";
+import { eventosCercanos } from "@/lib/emparejamiento";
 
-type EventoOpcion = { id: string; texto: string };
+type EventoOpcion = { id: string; texto: string; fecha_inicio: string | null; estado: string };
 
 // Eventos para elegir a cuál va el gasto (los más recientes primero)
 export function useEventosOpciones() {
   const { datos } = useTablaEnVivo<EventoOpcion>(["eventos", "clientes"], async (sb) => {
-    const { data } = await sb.from("eventos").select("id, fecha_inicio, cliente:clientes(nombre)")
+    const { data } = await sb.from("eventos").select("id, fecha_inicio, estado, cliente:clientes(nombre)")
       .is("deleted_at", null).order("fecha_inicio", { ascending: false, nullsFirst: false });
     return (data ?? []).map((e) => ({
-      id: e.id,
+      id: e.id, fecha_inicio: e.fecha_inicio, estado: e.estado,
       texto: `${e.fecha_inicio ? formatoFecha(e.fecha_inicio) : "Sin fecha"} · ${(uno(e.cliente) as { nombre: string } | null)?.nombre ?? "Evento"}`,
     }));
   });
@@ -87,6 +88,8 @@ export function DialogoGasto({ cerrar, gasto, eventoId }: { cerrar: () => void; 
 
   const existente = proveedores.find((p) => p.nombre.trim().toLowerCase() === c.proveedor.trim().toLowerCase());
   const tipo = c.evento ? "variable" : "fijo";
+  // Los 3 eventos más cercanos a la fecha de la factura, para elegir con un toque
+  const cercanos = useMemo(() => (c.evento || !c.fecha ? [] : eventosCercanos(c.fecha, eventos).filter((e) => e.fecha_inicio).slice(0, 3)), [c.evento, c.fecha, eventos]);
   const categorias = useMemo(() => listas.categoriasGasto.filter((x) => x.tipo === tipo), [listas.categoriasGasto, tipo]);
   const base = leerEuros(c.base);
   const total = base !== null ? totalRecibida(base, Number(c.iva) || 0, Number(c.irpf) || 0) : null;
@@ -137,6 +140,10 @@ export function DialogoGasto({ cerrar, gasto, eventoId }: { cerrar: () => void; 
     e.preventDefault();
     if (!c.proveedor.trim()) return toast.error("Escribe el proveedor");
     if (base === null || base < 0) return toast.error("Escribe la base (sin IVA)");
+    // Un proveedor de eventos (montadores, furgonetas…) apuntado como gasto general: preguntar
+    const habitual = listas.categoriasGasto.find((x) => x.codigo === existente?.categoria);
+    if (!c.evento && habitual?.tipo === "variable"
+      && !window.confirm(`${existente!.nombre} suele ser un gasto de evento (${habitual.nombre}). ¿Guardarlo como gasto general, sin evento?`)) return;
     if (archivo && archivo.size > 4 * 1024 * 1024) return toast.error("El archivo pesa más de 4 MB");
     setGuardando(true);
     try {
@@ -237,6 +244,15 @@ export function DialogoGasto({ cerrar, gasto, eventoId }: { cerrar: () => void; 
                   onTexto={setEventoTexto}
                   onElegir={(s) => { setC((x) => ({ ...x, evento: s.id, categoria: "" })); setEventoTexto(""); }}
                   sugerencias={eventos.map((e) => ({ id: e.id, texto: e.texto }))} />
+                {cercanos.length > 0 && (
+                  <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                    ¿Es de alguno de estos?
+                    {cercanos.map((e) => (
+                      <button key={e.id} type="button" className="rounded-full border bg-card px-2 py-0.5 text-foreground hover:bg-muted"
+                        onClick={() => setC((x) => ({ ...x, evento: e.id, categoria: "" }))}>{e.texto}</button>
+                    ))}
+                  </span>
+                )}
                 <span className="text-xs text-muted-foreground">Si no eliges ninguno, es un gasto general (gestoría, web, seguro…).</span>
               </>
             )}

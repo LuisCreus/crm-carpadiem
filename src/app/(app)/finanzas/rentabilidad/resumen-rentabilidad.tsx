@@ -2,15 +2,17 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { Cabecera } from "@/components/cabecera";
 import { Button } from "@/components/ui/button";
-import { useRentabilidad } from "@/hooks/use-rentabilidad";
+import { nombreDe, useListas } from "@/hooks/use-listas";
+import { useRentabilidad, type FacturaDetalle, type GastoDetalle } from "@/hooks/use-rentabilidad";
 import { formatoEuros, formatoFecha, hoyMadrid } from "@/lib/formato";
 import { MESES } from "@/lib/negocio";
-import { rentabilidadEvento, resumenMensual } from "@/lib/rentabilidad";
+import { rentabilidadEvento, resumenMensual, type Rentabilidad } from "@/lib/rentabilidad";
 import { cn } from "@/lib/utils";
 import { PestanasFinanzas } from "../pestanas";
+import { RevisarEmparejamiento } from "./revisar";
 
 const pct = (n: number | null) => (n === null ? "—" : `${Math.round(n * 100)} %`);
 const mayus = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -20,6 +22,7 @@ export function ResumenRentabilidad() {
   const [anio, setAnio] = useState(Number(hoyMadrid().slice(0, 4)));
   const [orden, setOrden] = useState<"fecha" | "margen">("fecha");
   const { datos, cargando } = useRentabilidad();
+  const [abierto, setAbierto] = useState<string | null>(null);
 
   const meses = useMemo(() => resumenMensual(anio, datos.eventos, datos.gastos, datos.facturas), [anio, datos]);
   const total = meses.reduce((s, m) => ({ ingresos: s.ingresos + m.ingresos, gastos: s.gastos + m.gastos }), { ingresos: 0, gastos: 0 });
@@ -80,8 +83,10 @@ export function ResumenRentabilidad() {
         </table>
       </section>
 
+      <RevisarEmparejamiento />
+
       <div className="mb-3 flex flex-wrap items-center gap-3">
-        <h2 className="flex-1 text-[15px] font-semibold">Eventos de {anio}</h2>
+        <h2 className="flex-1 text-[15px] font-semibold">Eventos de {anio} <span className="text-xs font-normal text-muted-foreground">· pulsa uno para ver su desglose</span></h2>
         <div role="group" aria-label="Orden" className="inline-flex overflow-hidden rounded-lg border text-sm">
           {([["fecha", "Por fecha"], ["margen", "Por margen"]] as const).map(([v, t]) => (
             <button key={v} type="button" aria-pressed={orden === v} onClick={() => setOrden(v)}
@@ -94,7 +99,9 @@ export function ResumenRentabilidad() {
         <ul className="divide-y rounded-xl border bg-card">
           {eventos.map(({ e, r }) => (
             <li key={e.id}>
-              <Link href={`/eventos/${e.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 no-underline hover:bg-muted/40 md:px-5">
+              <button type="button" aria-expanded={abierto === e.id} onClick={() => setAbierto(abierto === e.id ? null : e.id)}
+                className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-left hover:bg-muted/40 md:px-5">
+                <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", abierto !== e.id && "-rotate-90")} aria-hidden />
                 <div className="min-w-0 flex-[1_1_220px] text-foreground">
                   <div className="text-sm font-medium">{e.cliente}{e.codigo && <span className="font-normal text-muted-foreground"> · {e.codigo}</span>}</div>
                   <div className="text-[13px] text-muted-foreground">
@@ -107,12 +114,70 @@ export function ResumenRentabilidad() {
                 <div className={cn("w-32 text-right text-sm font-semibold", r.margen < 0 ? "text-destructive" : "text-[#25683D]")}>
                   {formatoEuros(r.margen)} <span className="text-xs font-normal">{pct(r.margenPct)}</span>
                 </div>
-              </Link>
+              </button>
+              {abierto === e.id && (
+                <DesgloseEvento eventoId={e.id} r={r}
+                  facturas={datos.facturas.filter((f) => f.evento_id === e.id && f.estado !== "prevista")}
+                  gastos={datos.gastos.filter((g) => g.evento_id === e.id)} />
+              )}
             </li>
           ))}
         </ul>
       )}
-      <p className="mt-4 text-[13px] text-muted-foreground">Los costes fijos y de personal (gestoría, web, sueldos…) no se restan aquí: siguen en el P&amp;L del Excel.</p>
+      <p className="mt-4 text-[13px] text-muted-foreground">Los costes fijos y de personal (gestoría, web, sueldos…) no se restan aquí: están en la pestaña P&amp;L.</p>
     </>
+  );
+}
+
+// Lo que hay dentro de un evento: lo facturado y los gastos por categoría, como la hoja Eventos del Excel
+function DesgloseEvento({ eventoId, r, facturas, gastos }: { eventoId: string; r: Rentabilidad; facturas: FacturaDetalle[]; gastos: GastoDetalle[] }) {
+  const listas = useListas();
+  const porCategoria = new Map<string, GastoDetalle[]>();
+  for (const g of gastos) porCategoria.set(g.categoria ?? "", [...(porCategoria.get(g.categoria ?? "") ?? []), g]);
+  const grupos = [...porCategoria.entries()].map(([c, l]) => ({ c, l, total: l.reduce((s, g) => s + g.base, 0) })).sort((a, b) => b.total - a.total);
+  const facturado = facturas.reduce((s, f) => s + f.importe, 0);
+  const tipo = (t: string) => ({ reserva: "Reserva", resto: "Resto", mensualidad: "Mensualidad" } as Record<string, string>)[t] ?? "Factura";
+  return (
+    <div className="grid gap-4 border-t bg-muted/20 px-4 py-4 text-[13px] md:grid-cols-2 md:px-5">
+      <div>
+        <h3 className="mb-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Facturado al cliente</h3>
+        {facturas.length === 0 && <p className="text-muted-foreground">Todavía no hay facturas emitidas.</p>}
+        <ul className="grid gap-1">
+          {facturas.map((f) => (
+            <li key={f.id} className="flex gap-2">
+              <span className="flex-1">{f.codigo} · {tipo(f.tipo)}
+                <span className="text-muted-foreground"> · {f.fecha_emision ? formatoFecha(f.fecha_emision) : ""}{f.estado === "pagada" ? " · cobrada" : " · por cobrar"}</span></span>
+              <span className="tabular-nums">{formatoEuros(f.importe)}</span>
+            </li>
+          ))}
+        </ul>
+        {facturas.length > 0 && Math.abs(facturado - r.ingresos) >= 1 && (
+          <p className="mt-1.5 text-muted-foreground">Facturado {formatoEuros(facturado)} de {formatoEuros(r.ingresos)} aceptados.</p>
+        )}
+      </div>
+      <div>
+        <h3 className="mb-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Gastos del evento</h3>
+        {grupos.length === 0 && r.comisionPrevista === 0 && <p className="text-muted-foreground">Sin gastos apuntados.</p>}
+        <ul className="grid gap-2">
+          {grupos.map(({ c, l, total }) => (
+            <li key={c}>
+              <div className="flex gap-2 font-medium"><span className="flex-1">{c ? nombreDe(listas.categoriasGasto, c) : "Sin categoría"}</span><span className="tabular-nums">{formatoEuros(total)}</span></div>
+              <ul className="ml-3 text-muted-foreground">
+                {l.map((g) => (
+                  <li key={g.id} className="flex gap-2">
+                    <span className="flex-1 truncate">{[g.proveedor, g.numero && `nº ${g.numero}`, formatoFecha(g.fecha)].filter(Boolean).join(" · ")}</span>
+                    <span className="tabular-nums">{formatoEuros(g.base)}</span>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))}
+          {r.comisionPrevista > 0 && (
+            <li className="flex gap-2 font-medium"><span className="flex-1">Comisión prevista <span className="font-normal text-muted-foreground">(hasta que llegue su factura)</span></span><span className="tabular-nums">{formatoEuros(r.comisionPrevista)}</span></li>
+          )}
+        </ul>
+        <p className="mt-2 text-muted-foreground">Importes sin IVA. <Link href={`/eventos/${eventoId}`}>Abrir el evento</Link> para añadir o cambiar gastos.</p>
+      </div>
+    </div>
   );
 }

@@ -4,18 +4,20 @@ import { useTablaEnVivo } from "@/hooks/use-tabla-en-vivo";
 import { uno } from "@/lib/datos/tipos";
 import type { EventoRentabilidad, FacturaRentabilidad, GastoRentabilidad } from "@/lib/rentabilidad";
 
+export type GastoDetalle = GastoRentabilidad & { id: string; numero: string | null; concepto: string | null; proveedor: string | null; total: number };
+export type FacturaDetalle = FacturaRentabilidad & { id: string; codigo: string | null; tipo: string };
 export type DatosRentabilidad = {
   eventos: (EventoRentabilidad & { codigo: string | null })[];
-  gastos: GastoRentabilidad[];
-  facturas: FacturaRentabilidad[];
+  gastos: GastoDetalle[];
+  facturas: FacturaDetalle[];
 };
 
 // Eventos, gastos y facturas para calcular la rentabilidad (de uno o de todos los eventos)
 export function useRentabilidad(eventoId?: string) {
   const { datos, cargando } = useTablaEnVivo<DatosRentabilidad>(["eventos", "presupuestos", "facturas", "facturas_recibidas"], async (sb) => {
     let ev = sb.from("eventos").select("id, estado, fecha_precision, fecha_inicio, importe, importe_retenido, es_larga_duracion, cliente:clientes(nombre), presupuesto:presupuestos(codigo, comision_pct, intermediario_id)").is("deleted_at", null);
-    let ga = sb.from("facturas_recibidas").select("evento_id, base, fecha, categoria").is("deleted_at", null).not("evento_id", "is", null);
-    let fa = sb.from("facturas").select("evento_id, importe, estado, fecha_emision").is("deleted_at", null);
+    let ga = sb.from("facturas_recibidas").select("id, evento_id, base, total, fecha, categoria, numero, concepto, proveedor:proveedores(nombre)").is("deleted_at", null).not("evento_id", "is", null);
+    let fa = sb.from("facturas").select("id, evento_id, importe, estado, fecha_emision, codigo, tipo").is("deleted_at", null);
     if (eventoId) {
       ev = ev.eq("id", eventoId);
       ga = ga.eq("evento_id", eventoId);
@@ -36,7 +38,7 @@ export function useRentabilidad(eventoId?: string) {
           codigo: p?.codigo ?? null,
         };
       }),
-      gastos: (g.data ?? []).map((x) => ({ ...x, base: Number(x.base) })),
+      gastos: (g.data ?? []).map((x) => ({ ...x, base: Number(x.base), total: Number(x.total), proveedor: (uno(x.proveedor) as { nombre: string } | null)?.nombre ?? null })),
       facturas: (f.data ?? []).map((x) => ({ ...x, importe: Number(x.importe) })),
     }];
   });
