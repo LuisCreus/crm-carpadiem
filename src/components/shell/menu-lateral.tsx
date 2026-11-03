@@ -6,10 +6,10 @@ import { LogOut, Search } from "lucide-react";
 import { abrirBusqueda } from "@/components/busqueda-global";
 import { Logo } from "@/components/logo";
 import { cn } from "@/lib/utils";
-import { NAV_PRINCIPAL, NAV_SECUNDARIA, estaActivo, type ItemNav } from "./navegacion";
+import { NAV_PRINCIPAL, NAV_SECUNDARIA, itemActivo, type ItemNav } from "./navegacion";
 
 function Enlace({ item, pathname }: { item: ItemNav; pathname: string }) {
-  const activo = estaActivo(pathname, item.href);
+  const activo = itemActivo(pathname, item);
   const Icono = item.icono;
   return (
     <Link

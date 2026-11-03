@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 import { Cabecera } from "@/components/cabecera";
 import { EstadoVacio } from "@/components/estado-vacio";
 import { DialogoGasto, LineaGasto } from "@/components/gastos";
+import { DialogoPagoBanco } from "@/components/pago-banco";
 import { Button } from "@/components/ui/button";
 import { useTablaEnVivo } from "@/hooks/use-tabla-en-vivo";
 import { SELECT_FACTURA_RECIBIDA, aFacturaRecibida, type FacturaRecibida } from "@/lib/datos/tipos";
@@ -17,6 +18,10 @@ const FILTROS = [["por_pagar", "Por pagar"], ["pagadas", "Pagadas"], ["todas", "
 export function ListaRecibidas() {
   const [filtro, setFiltro] = useState<(typeof FILTROS)[number][0]>("por_pagar");
   const [nueva, setNueva] = useState(false);
+  // Facturas elegidas para pagar con el fichero del Santander
+  const [elegidas, setElegidas] = useState<Set<string>>(new Set());
+  const [pagando, setPagando] = useState(false);
+  const cambiar = (id: string) => setElegidas((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const hoy = hoyMadrid();
   const { datos, cargando } = useTablaEnVivo<FacturaRecibida>(["facturas_recibidas", "proveedores", "eventos"], async (sb) => {
     const { data, error } = await sb.from("facturas_recibidas").select(SELECT_FACTURA_RECIBIDA)
@@ -31,6 +36,7 @@ export function ListaRecibidas() {
   const vencidas = porPagar.filter((g) => g.vencimiento && g.vencimiento < hoy);
   const delMes = datos.filter((g) => g.fecha.startsWith(hoy.slice(0, 7)));
   const suma = (l: FacturaRecibida[]) => l.reduce((s, g) => s + g.total, 0);
+  const seleccionadas = porPagar.filter((g) => elegidas.has(g.id));
 
   return (
     <>
@@ -68,8 +74,26 @@ export function ListaRecibidas() {
       )}
       {lista.length > 0 && (
         <ul className="rounded-xl border bg-card px-4 md:px-5">
-          {lista.map((g) => <LineaGasto key={g.id} g={g} />)}
+          {lista.map((g) => (
+            <LineaGasto key={g.id} g={g}
+              seleccion={g.estado === "pendiente" ? { marcada: elegidas.has(g.id), cambiar: () => cambiar(g.id) } : undefined} />
+          ))}
         </ul>
+      )}
+      {porPagar.length > 0 && (
+        <div className="sticky bottom-20 z-10 mt-4 flex flex-wrap items-center gap-3 rounded-xl border bg-card p-3 shadow-sm md:bottom-4">
+          <span className="flex-1 text-sm">
+            {seleccionadas.length
+              ? <>{seleccionadas.length} {seleccionadas.length === 1 ? "elegida" : "elegidas"} · <b>{formatoEuros(suma(seleccionadas))}</b></>
+              : "Marca las facturas que quieres pagar"}
+          </span>
+          <Button variant="ghost" size="sm" onClick={() => setElegidas(new Set(porPagar.filter((g) => !g.fichero_pago_at).map((g) => g.id)))}>Elegir todas</Button>
+          <Button disabled={!seleccionadas.length} onClick={() => setPagando(true)}>Pagar con el Santander</Button>
+        </div>
+      )}
+      {pagando && (
+        <DialogoPagoBanco facturas={seleccionadas} cerrar={() => setPagando(false)}
+          alTerminar={() => { setPagando(false); setElegidas(new Set()); }} />
       )}
       {nueva && <DialogoGasto cerrar={() => setNueva(false)} />}
     </>

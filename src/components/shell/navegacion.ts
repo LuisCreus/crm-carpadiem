@@ -1,8 +1,9 @@
 import {
-  Boxes, CalendarDays, FileText, Home, Receipt, Settings, Tent, Trash2, Truck, UserRound, Users, type LucideIcon,
+  Boxes, CalendarDays, FileText, Home, Receipt, Settings, Tent, Trash2, UserRound, Users, type LucideIcon,
 } from "lucide-react";
 
-export type ItemNav = { href: string; titulo: string; icono: LucideIcon; soloAdmin?: boolean };
+// "tambien": otras pantallas que cuentan como esta opción del menú (p. ej. las pestañas de Contactos)
+export type ItemNav = { href: string; titulo: string; icono: LucideIcon; soloAdmin?: boolean; tambien?: string[] };
 
 export const NAV_PRINCIPAL: ItemNav[] = [
   { href: "/", titulo: "Inicio", icono: Home },
@@ -11,8 +12,7 @@ export const NAV_PRINCIPAL: ItemNav[] = [
   { href: "/eventos", titulo: "Eventos", icono: Tent },
   { href: "/planificacion", titulo: "Planificación", icono: CalendarDays },
   { href: "/facturas", titulo: "Facturas", icono: Receipt },
-  { href: "/intermediarios", titulo: "Intermediarios", icono: Users },
-  { href: "/proveedores", titulo: "Proveedores", icono: Truck },
+  { href: "/proveedores", titulo: "Contactos", icono: Users, tambien: ["/intermediarios"] },
   { href: "/inventario", titulo: "Inventario", icono: Boxes },
 ];
 
@@ -23,6 +23,10 @@ export const NAV_SECUNDARIA: ItemNav[] = [
 
 // Pestañas de abajo en el móvil (el resto va en "Más")
 export const NAV_MOVIL = ["/", "/planificacion", "/presupuestos", "/leads"];
+
+export function itemActivo(pathname: string, item: ItemNav) {
+  return [item.href, ...(item.tambien ?? [])].some((href) => estaActivo(pathname, href));
+}
 
 export function estaActivo(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Mail, Pencil, Phone, Trash2 } from "lucide-react";
 import { Cabecera } from "@/components/cabecera";
 import { EstadoVacio } from "@/components/estado-vacio";
+import { PestanasContactos } from "@/components/pestanas-contactos";
 import { HistorialDialogo } from "@/components/historial-dialogo";
 import { Campo, claseSelect } from "@/components/campo";
 import { Button } from "@/components/ui/button";
@@ -87,9 +88,10 @@ export function ListaIntermediarios() {
 
   return (
     <>
-      <Cabecera titulo="Intermediarios" subtitulo="Wedding planners, fincas y otros que nos traen clientes">
+      <Cabecera titulo="Contactos" subtitulo="Intermediarios: wedding planners, fincas y otros que nos traen clientes">
         <Button onClick={nuevo}>+ Nuevo intermediario</Button>
       </Cabecera>
+      <PestanasContactos activa="intermediarios" />
 
       {error && <p role="alert" className="mb-4 text-sm text-destructive">{error}</p>}
 

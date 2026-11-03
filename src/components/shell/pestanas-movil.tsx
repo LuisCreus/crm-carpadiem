@@ -4,12 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Ellipsis } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { NAV_MOVIL, NAV_PRINCIPAL, estaActivo } from "./navegacion";
+import { NAV_MOVIL, NAV_PRINCIPAL, itemActivo } from "./navegacion";
 
 export function PestanasMovil() {
   const pathname = usePathname();
   const pestanas = NAV_MOVIL.map((href) => NAV_PRINCIPAL.find((i) => i.href === href)!);
-  const enMas = !pestanas.some((p) => estaActivo(pathname, p.href));
+  const enMas = !pestanas.some((p) => itemActivo(pathname, p));
 
   const clase = (activo: boolean) =>
     cn(
@@ -24,7 +24,7 @@ export function PestanasMovil() {
     >
       {pestanas.map((item) => {
         const Icono = item.icono;
-        const activo = estaActivo(pathname, item.href);
+        const activo = itemActivo(pathname, item);
         return (
           <Link key={item.href} href={item.href} className={clase(activo)} aria-current={activo ? "page" : undefined}>
             <Icono className="size-[22px]" strokeWidth={1.8} aria-hidden />

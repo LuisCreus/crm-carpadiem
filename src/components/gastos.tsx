@@ -46,8 +46,9 @@ function useProveedores() {
   return datos;
 }
 
-export function EtiquetaGasto({ g, hoy }: { g: Pick<FacturaRecibida, "estado" | "vencimiento">; hoy: string }) {
+export function EtiquetaGasto({ g, hoy }: { g: Pick<FacturaRecibida, "estado" | "vencimiento" | "fichero_pago_at">; hoy: string }) {
   if (g.estado === "pagada") return <Etiqueta className="bg-[#E8F4EC] text-[#25683D]">Pagada</Etiqueta>;
+  if (g.fichero_pago_at) return <Etiqueta className="bg-[#EEF4F7] text-[#2F5D70]">En fichero {formatoFecha(g.fichero_pago_at)}</Etiqueta>;
   if (g.vencimiento && g.vencimiento < hoy) return <Etiqueta className="bg-[#FDEDEC] text-[#B0302A]">Vencida</Etiqueta>;
   return <Etiqueta className="bg-[#FDF3E1] text-[#8A5A0B]">Por pagar</Etiqueta>;
 }
@@ -273,7 +274,20 @@ export function DialogoGasto({ cerrar, gasto, eventoId }: { cerrar: () => void; 
 }
 
 // Una factura recibida en una lista, con sus botones
-export function LineaGasto({ g, mostrarEvento = true }: { g: FacturaRecibida; mostrarEvento?: boolean }) {
+// Copia al portapapeles (IBAN, importe, concepto) para hacer una transferencia suelta
+function Copiar({ texto, etiqueta }: { texto: string; etiqueta: string }) {
+  return (
+    <button type="button" className="flex w-full items-center justify-between gap-3 rounded-lg border bg-background px-3 py-2 text-left text-sm hover:bg-muted"
+      onClick={async () => { await navigator.clipboard.writeText(texto); toast.success(`${etiqueta} copiado ✓`); }}>
+      <span><span className="text-xs text-muted-foreground">{etiqueta}</span><br />{texto}</span>
+      <span className="text-xs text-muted-foreground">Copiar</span>
+    </button>
+  );
+}
+
+export function LineaGasto({ g, mostrarEvento = true, seleccion }: {
+  g: FacturaRecibida; mostrarEvento?: boolean; seleccion?: { marcada: boolean; cambiar: () => void };
+}) {
   const listas = useListas();
   const hoy = hoyMadrid();
   const [dialogo, setDialogo] = useState<"editar" | "pagar" | null>(null);
@@ -305,6 +319,9 @@ export function LineaGasto({ g, mostrarEvento = true }: { g: FacturaRecibida; mo
 
   return (
     <li className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t py-3 text-sm first:border-t-0">
+      {seleccion && (
+        <input type="checkbox" className="size-4" aria-label={`Pagar ${g.proveedor?.nombre ?? "factura"}`} checked={seleccion.marcada} onChange={seleccion.cambiar} />
+      )}
       <div className="min-w-0 flex-[1_1_240px]">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium">{g.proveedor?.nombre ?? "Sin proveedor"}</span>
@@ -347,8 +364,14 @@ export function LineaGasto({ g, mostrarEvento = true }: { g: FacturaRecibida; mo
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Pagada</DialogTitle>
-            <DialogDescription>{g.proveedor?.nombre} · {formatoEuros(g.total)}{g.iban ? ` · IBAN ${g.iban}` : ""}</DialogDescription>
+            <DialogDescription>Para una transferencia suelta, copia los datos en el Santander. Para varias a la vez, usa “Pagar con el Santander”.</DialogDescription>
           </DialogHeader>
+          <div className="grid gap-2">
+            {g.proveedor?.nombre && <Copiar etiqueta="Beneficiario" texto={g.proveedor.nombre} />}
+            {g.iban && <Copiar etiqueta="IBAN" texto={g.iban} />}
+            <Copiar etiqueta="Importe" texto={g.total.toFixed(2).replace(".", ",")} />
+            <Copiar etiqueta="Concepto" texto={g.concepto ?? (g.numero ? `Pago factura ${g.numero}` : "Pago factura")} />
+          </div>
           <Campo id={`gp-${g.id}`} etiqueta="Fecha del pago">
             <Input id={`gp-${g.id}`} type="date" value={fechaPago} onChange={(e) => setFechaPago(e.target.value)} />
           </Campo>

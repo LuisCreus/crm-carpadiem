@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Mail, Pencil, Phone, Trash2 } from "lucide-react";
 import { Cabecera } from "@/components/cabecera";
 import { EstadoVacio } from "@/components/estado-vacio";
+import { PestanasContactos } from "@/components/pestanas-contactos";
 import { HistorialDialogo } from "@/components/historial-dialogo";
 import { Campo, claseSelect } from "@/components/campo";
 import { Button } from "@/components/ui/button";
@@ -86,9 +87,10 @@ export function ListaProveedores() {
 
   return (
     <>
-      <Cabecera titulo="Proveedores" subtitulo="Montadores, alquileres, gestoría… con su NIF e IBAN para sus facturas y pagos">
+      <Cabecera titulo="Contactos" subtitulo="Proveedores: montadores, alquileres, gestoría… con su NIF e IBAN para sus facturas y pagos">
         <Button onClick={nuevo}>+ Nuevo proveedor</Button>
       </Cabecera>
+      <PestanasContactos activa="proveedores" />
 
       {error && <p role="alert" className="mb-4 text-sm text-destructive">{error}</p>}
       {datos.length > 5 && (
