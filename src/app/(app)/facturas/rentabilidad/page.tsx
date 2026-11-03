@@ -1,8 +1,6 @@
-import type { Metadata } from "next";
-import { ResumenRentabilidad } from "./resumen-rentabilidad";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Rentabilidad" };
-
-export default function RentabilidadPage() {
-  return <ResumenRentabilidad />;
+// La rentabilidad se ha movido a Finanzas
+export default function Page() {
+  redirect("/finanzas/rentabilidad");
 }

@@ -1,10 +1,6 @@
-import type { Metadata } from "next";
-import { obtenerUsuario } from "@/lib/auth";
-import { PantallaPyg } from "./pantalla-pyg";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "P&L" };
-
-export default async function PygPage() {
-  const usuario = await obtenerUsuario();
-  return <PantallaPyg esAdmin={usuario.esAdmin} />;
+// La P&L se ha movido a Finanzas
+export default function Page() {
+  redirect("/finanzas");
 }

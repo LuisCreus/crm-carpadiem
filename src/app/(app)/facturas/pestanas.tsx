@@ -4,13 +4,11 @@ import { cn } from "@/lib/utils";
 const PESTANAS = [
   ["emitidas", "/facturas", "Emitidas"],
   ["recibidas", "/facturas/recibidas", "Recibidas (gastos)"],
-  ["rentabilidad", "/facturas/rentabilidad", "Rentabilidad"],
-  ["pyg", "/facturas/pyg", "P&L"],
   ["gestoria", "/facturas/gestoria", "Gestoría"],
   ["banco", "/facturas/banco", "Banco"],
 ] as const;
 
-// Emitidas (a clientes) · Recibidas (de proveedores) · Rentabilidad · P&L · Gestoría (por trimestre) · Banco (conciliar)
+// Emitidas (a clientes) · Recibidas (de proveedores) · Gestoría (por trimestre) · Banco (conciliar)
 export function PestanasFacturas({ activa }: { activa: (typeof PESTANAS)[number][0] }) {
   return (
     <nav aria-label="Facturas" className="mb-5 inline-flex max-w-full overflow-x-auto rounded-lg border text-sm">

@@ -16,7 +16,7 @@ import { calcularPyg, cuotaActivo, type Activo, type EventoPyg, type Fila, type 
 import type { FacturaRentabilidad } from "@/lib/rentabilidad";
 import { crearClienteNavegador } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
-import { PestanasFacturas } from "../pestanas";
+import { PestanasFinanzas } from "./pestanas";
 
 type ActivoFila = Activo & { factura_recibida_id: string | null; notas: string | null };
 type Datos = { eventos: EventoPyg[]; gastos: GastoPyg[]; facturas: FacturaRentabilidad[]; activos: ActivoFila[]; manual: Manual[] };
@@ -105,14 +105,14 @@ export function PantallaPyg({ esAdmin }: { esAdmin: boolean }) {
 
   return (
     <>
-      <Cabecera titulo="Facturas" subtitulo="Cuenta de pérdidas y ganancias, mes a mes (sin IVA)">
+      <Cabecera titulo="Finanzas" subtitulo="Cuenta de pérdidas y ganancias por fecha de factura, mes a mes (sin IVA)">
         <div className="inline-flex items-center gap-1 rounded-lg border bg-card text-sm">
           <Button variant="ghost" size="sm" aria-label="Año anterior" onClick={() => setAnio(anio - 1)}><ChevronLeft className="size-4" /></Button>
           <span className="px-1 font-medium">{anio}</span>
           <Button variant="ghost" size="sm" aria-label="Año siguiente" onClick={() => setAnio(anio + 1)}><ChevronRight className="size-4" /></Button>
         </div>
       </Cabecera>
-      <PestanasFacturas activa="pyg" />
+      <PestanasFinanzas activa="pyg" />
 
       {p && (
         <>
@@ -154,8 +154,8 @@ export function PantallaPyg({ esAdmin }: { esAdmin: boolean }) {
             </table>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            Ingresos y costes de cada evento en el mes del evento; gastos generales en el mes de su factura. El impuesto se calcula sobre lo acumulado
-            en el año (un mes con pérdidas compensa los siguientes).{p.sinFecha > 0 && ` ${p.sinFecha} ${p.sinFecha === 1 ? "evento sin fecha cerrada no entra" : "eventos sin fecha cerrada no entran"}.`}
+            Cada factura cuenta en el mes de su fecha: lo facturado a clientes como ingreso y lo que nos facturan como coste, sea cuando sea el evento.
+            El impuesto se calcula sobre lo acumulado en el año (un mes con pérdidas compensa los siguientes).
             {" El sueldo del director sale de las facturas de Maketa."}{esAdmin && " Bonus e intereses: pulsa en la celda para escribirlos."}
           </p>
 

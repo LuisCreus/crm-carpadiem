@@ -1,13 +1,13 @@
 // Cuenta de pérdidas y ganancias (P&L) de un año, mes a mes, como la hoja "P&L" del Excel.
-//   · Ingresos: como en Rentabilidad (importe aceptado en el mes del evento; los de larga
-//     duración, cada factura en su mes), desglosados por tipo de evento.
-//   · Costes variables: gastos de cada evento (en el mes del evento) + comisión prevista.
+// Todo por fecha de factura: lo facturado y lo que nos facturan cada mes, haya sido cuando haya sido el evento.
+//   · Ingresos: la base de cada factura emitida en el mes de su emisión (sin suplidos), por tipo de evento.
+//   · Costes variables: las facturas recibidas de un evento (o de categoría variable), en su mes.
 //   · Costes fijos: gastos generales en el mes de su factura. El material de carpas no: es CAPEX.
 //   · Personal: el sueldo del director son las facturas de su categoría (Maketa); el bonus, a mano.
 //   · Intereses: a mano. Amortización: cada activo desde su mes de compra.
 //   · IS: 15 % hasta 2027 y 25 % desde 2028, sobre el beneficio acumulado del año.
 
-import { rentabilidadEvento, type EventoRentabilidad, type FacturaRentabilidad } from "@/lib/rentabilidad";
+import type { EventoRentabilidad, FacturaRentabilidad } from "@/lib/rentabilidad";
 
 const redondear = (n: number) => Math.round(n * 100) / 100;
 export const CATEGORIA_CAPEX = "material_carpas";
@@ -28,7 +28,6 @@ export type Pyg = {
   personal: Fila; director: Fila; bonus: Fila;
   ebitda: Fila; amortizacion: Fila; ebit: Fila; intereses: Fila; ebt: Fila; impuesto: Fila; neto: Fila;
   tipoImpuesto: number;
-  sinFecha: number; // eventos sin fecha cerrada (no entran)
 };
 
 const ceros = () => Array<number>(12).fill(0);
@@ -59,33 +58,18 @@ export function calcularPyg(anio: number, eventos: EventoPyg[], gastos: GastoPyg
   const ingresos = grupos(), variables = grupos(), fijos = grupos();
   const sueldo = ceros();
   const nombreCategoria = (c: string | null) => (c ? nombres.categorias.get(c)?.nombre ?? c : "Sin categoría");
-  let sinFecha = 0;
 
-  const deEvento = new Map(eventos.map((e) => [e.id, e]));
-  for (const e of eventos) {
-    if (e.estado === "cancelado") continue;
-    const tipo = e.tipo_evento ?? "otro";
-    if (e.es_larga_duracion) {
-      for (const f of facturas.filter((x) => x.evento_id === e.id && x.estado !== "prevista" && delAnio(x.fecha_emision))) sumar(ingresos, tipo, indice(f.fecha_emision!), f.importe);
-      continue;
-    }
-    if (e.fecha_precision === "por_definir" || !e.fecha_inicio) { sinFecha++; continue; }
-    if (!delAnio(e.fecha_inicio)) continue;
-    const r = rentabilidadEvento(e, [], facturas);
-    sumar(ingresos, tipo, indice(e.fecha_inicio), r.ingresos);
-    const comision = rentabilidadEvento(e, gastos, facturas).comisionPrevista;
-    if (comision) sumar(variables, "comisiones", indice(e.fecha_inicio), comision);
+  const tipoDe = new Map(eventos.map((e) => [e.id, e.tipo_evento]));
+  for (const f of facturas) {
+    if (f.estado === "prevista" || !delAnio(f.fecha_emision)) continue;
+    sumar(ingresos, (f.evento_id && tipoDe.get(f.evento_id)) || "otro", indice(f.fecha_emision!), f.importe);
   }
 
   for (const g of gastos) {
-    if (g.categoria === CATEGORIA_CAPEX) continue;
-    const e = g.evento_id ? deEvento.get(g.evento_id) : undefined;
-    // El gasto de un evento va al mes del evento (salvo larga duración o evento sin fecha: al de la factura)
-    const fecha = e && !e.es_larga_duracion && e.fecha_precision !== "por_definir" && e.fecha_inicio ? e.fecha_inicio : g.fecha;
-    if (!delAnio(fecha)) continue;
-    if (g.categoria === CATEGORIA_DIRECTOR) { sueldo[indice(fecha)] += g.base; continue; }
+    if (g.categoria === CATEGORIA_CAPEX || !delAnio(g.fecha)) continue;
+    if (g.categoria === CATEGORIA_DIRECTOR) { sueldo[indice(g.fecha)] += g.base; continue; }
     const esVariable = g.evento_id ? true : nombres.categorias.get(g.categoria ?? "")?.tipo === "variable";
-    sumar(esVariable ? variables : fijos, g.categoria ?? "sin", indice(fecha), g.base);
+    sumar(esVariable ? variables : fijos, g.categoria ?? "sin", indice(g.fecha), g.base);
   }
 
   const aFilas = (g: Map<string, number[]>, nombre: (c: string) => string) =>
@@ -126,5 +110,5 @@ export function calcularPyg(anio: number, eventos: EventoPyg[], gastos: GastoPyg
   }));
   const neto = restar("neto", "Beneficio neto", ebt, impuesto);
 
-  return { ingresos: tIngresos, porTipo, variables: tVariables, porVariable, margenBruto, fijos: tFijos, porFijo, personal, director, bonus, ebitda, amortizacion, ebit, intereses, ebt, impuesto, neto, tipoImpuesto: tipo, sinFecha };
+  return { ingresos: tIngresos, porTipo, variables: tVariables, porVariable, margenBruto, fijos: tFijos, porFijo, personal, director, bonus, ebitda, amortizacion, ebit, intereses, ebt, impuesto, neto, tipoImpuesto: tipo };
 }

@@ -10,7 +10,7 @@ import { formatoEuros, formatoFecha, hoyMadrid } from "@/lib/formato";
 import { MESES } from "@/lib/negocio";
 import { rentabilidadEvento, resumenMensual } from "@/lib/rentabilidad";
 import { cn } from "@/lib/utils";
-import { PestanasFacturas } from "../pestanas";
+import { PestanasFinanzas } from "../pestanas";
 
 const pct = (n: number | null) => (n === null ? "—" : `${Math.round(n * 100)} %`);
 const mayus = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -34,14 +34,14 @@ export function ResumenRentabilidad() {
 
   return (
     <>
-      <Cabecera titulo="Facturas" subtitulo="Rentabilidad de los eventos: lo aceptado menos sus gastos, sin IVA">
+      <Cabecera titulo="Finanzas" subtitulo="Rentabilidad de los eventos: lo aceptado menos sus gastos, sin IVA">
         <div role="group" aria-label="Año" className="flex items-center gap-1">
           <Button variant="outline" size="icon" aria-label="Año anterior" onClick={() => setAnio(anio - 1)}><ChevronLeft className="size-4" aria-hidden /></Button>
           <span className="min-w-14 text-center font-semibold">{anio}</span>
           <Button variant="outline" size="icon" aria-label="Año siguiente" onClick={() => setAnio(anio + 1)}><ChevronRight className="size-4" aria-hidden /></Button>
         </div>
       </Cabecera>
-      <PestanasFacturas activa="rentabilidad" />
+      <PestanasFinanzas activa="rentabilidad" />
 
       <div className="mb-5 grid gap-3 sm:grid-cols-3">
         {([["Ingresos", total.ingresos], ["Gastos de eventos", total.gastos], ["Margen bruto", margenTotal]] as const).map(([t, v]) => (

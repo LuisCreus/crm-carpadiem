@@ -1,5 +1,5 @@
 import {
-  Boxes, CalendarDays, FileText, Home, Receipt, Settings, Tent, Trash2, UserRound, Users, type LucideIcon,
+  Boxes, CalendarDays, FileText, Home, Receipt, Settings, Tent, Trash2, TrendingUp, UserRound, Users, type LucideIcon,
 } from "lucide-react";
 
 // "tambien": otras pantallas que cuentan como esta opción del menú (p. ej. las pestañas de Contactos)
@@ -12,6 +12,7 @@ export const NAV_PRINCIPAL: ItemNav[] = [
   { href: "/eventos", titulo: "Eventos", icono: Tent },
   { href: "/planificacion", titulo: "Planificación", icono: CalendarDays },
   { href: "/facturas", titulo: "Facturas", icono: Receipt },
+  { href: "/finanzas", titulo: "Finanzas", icono: TrendingUp },
   { href: "/proveedores", titulo: "Contactos", icono: Users, tambien: ["/intermediarios"] },
   { href: "/inventario", titulo: "Inventario", icono: Boxes },
 ];
