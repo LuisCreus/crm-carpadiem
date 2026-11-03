@@ -12,10 +12,12 @@ import { SELECT_FACTURA_RECIBIDA, aFacturaRecibida, type FacturaRecibida } from 
 import { formatoEuros, hoyMadrid } from "@/lib/formato";
 import { cn } from "@/lib/utils";
 import { PestanasFacturas } from "../pestanas";
+import { useEsAdmin } from "@/components/usuario";
 
 const FILTROS = [["por_pagar", "Por pagar"], ["pagadas", "Pagadas"], ["todas", "Todas"]] as const;
 
 export function ListaRecibidas() {
+  const esAdmin = useEsAdmin();
   const [filtro, setFiltro] = useState<(typeof FILTROS)[number][0]>("por_pagar");
   const [nueva, setNueva] = useState(false);
   // Facturas elegidas para pagar con el fichero del Santander
@@ -80,7 +82,7 @@ export function ListaRecibidas() {
           ))}
         </ul>
       )}
-      {porPagar.length > 0 && (
+      {esAdmin && porPagar.length > 0 && (
         <div className="sticky bottom-20 z-10 mt-4 flex flex-wrap items-center gap-3 rounded-xl border bg-card p-3 shadow-sm md:bottom-4">
           <span className="flex-1 text-sm">
             {seleccionadas.length

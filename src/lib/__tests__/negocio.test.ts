@@ -39,6 +39,9 @@ describe("nombres de archivos", () => {
 
   it("hoja de montaje", () => {
     expect(nombreHojaMontaje(78, "Carlota Durán")).toBe("HOJA DE MONTAJE CD 078 CARLOTA DURÁN.pdf");
+    // Desde 2027 el año va en el nombre, con guion (la barra no se admite en archivos)
+    expect(nombreArchivoPresupuesto(1, "Ana", 1, "pdf", 2027)).toBe("PRESUPUESTO CD 001-27 ANA V01.pdf");
+    expect(nombreHojaMontaje(1, "Ana", 2027)).toBe("HOJA DE MONTAJE CD 001-27 ANA.pdf");
   });
 });
 

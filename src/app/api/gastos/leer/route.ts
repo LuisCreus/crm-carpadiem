@@ -3,7 +3,8 @@ import { extractText, getDocumentProxy } from "unpdf";
 import { obtenerUsuario } from "@/lib/auth";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { leerDatosFactura } from "@/lib/leer-factura";
-// Generar documentos con Microsoft puede tardar: hasta 60 sexport const maxDuration = 60;
+// Generar documentos con Microsoft puede tardar: hasta 60 s
+export const maxDuration = 60;
 
 // Lee el texto de una factura en PDF y saca sus datos principales (no guarda nada).
 // Si el NIF o el IBAN coinciden con un proveedor guardado, lo devuelve también.

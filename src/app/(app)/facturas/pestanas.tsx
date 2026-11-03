@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useEsAdmin } from "@/components/usuario";
 import { cn } from "@/lib/utils";
 
 const PESTANAS = [
@@ -10,9 +13,12 @@ const PESTANAS = [
 
 // Emitidas (a clientes) · Recibidas (de proveedores) · Gestoría (por trimestre) · Banco (conciliar)
 export function PestanasFacturas({ activa }: { activa: (typeof PESTANAS)[number][0] }) {
+  const esAdmin = useEsAdmin();
+  // Gestoría y Banco, solo el administrador
+  const visibles = PESTANAS.filter(([clave]) => esAdmin || (clave !== "gestoria" && clave !== "banco"));
   return (
     <nav aria-label="Facturas" className="mb-5 inline-flex max-w-full overflow-x-auto rounded-lg border text-sm">
-      {PESTANAS.map(([clave, href, texto]) => (
+      {visibles.map(([clave, href, texto]) => (
         <Link key={clave} href={href} aria-current={activa === clave ? "page" : undefined}
           className={cn("px-3 py-1.5 whitespace-nowrap no-underline", activa === clave ? "bg-foreground text-background" : "bg-card text-foreground")}>
           {texto}

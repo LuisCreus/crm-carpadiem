@@ -52,7 +52,7 @@ async function ubicacion(itemId: string | null, anio: number, t: number): Promis
 
 export async function verTrimestre(anio: number, t: number): Promise<{ ok: true; datos: Trimestre } | { ok: false; error: string }> {
   try {
-    await obtenerUsuario();
+    if (!(await obtenerUsuario()).esAdmin) return { ok: false, error: "Solo el administrador" };
     if (!sharepointConfigurado()) throw new Error("SharePoint no está configurado");
     const { emitidas, recibidas, emailGestoria } = await cargar(anio, t);
     const filas: FilaGestoria[] = [];
@@ -94,7 +94,7 @@ async function mover(itemId: string, carpeta: string, nombre: string) {
 
 export async function pasarTrimestre(anio: number, t: number): Promise<{ ok: true; movidos: number; marcadas: number; excelUrl: string; borrador: string | null } | { ok: false; error: string }> {
   try {
-    await obtenerUsuario();
+    if (!(await obtenerUsuario()).esAdmin) return { ok: false, error: "Solo el administrador" };
     const { sb, emitidas, recibidas, emailGestoria } = await cargar(anio, t);
     const carpeta = rutaReal(carpetaTrimestre(anio, t));
     const ahora = new Date().toISOString();

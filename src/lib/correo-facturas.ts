@@ -17,7 +17,7 @@ export async function estadoCorreo(): Promise<{ configurado: boolean; buzon: str
 
 export async function prepararCorreoFactura(facturaId: string, correo: { para: string; asunto: string; texto: string }): Promise<Resultado> {
   try {
-    await obtenerUsuario();
+    if (!(await obtenerUsuario()).esAdmin) return { ok: false, error: "Solo el administrador" };
     const para = correo.para.split(/[;,\s]+/).map((x) => x.trim()).filter(Boolean);
     if (!para.length || para.some((x) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x))) throw new Error("Revisa el email del destinatario");
     const sb = await crearClienteServidor();

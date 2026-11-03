@@ -194,7 +194,7 @@ export function AjustesAdmin({ miId }: { miId: string }) {
                 />
               </label>
               <span className="text-muted-foreground">
-                {n.ultimo_numero > 0 ? `Último: ${codigoPresupuesto(n.ultimo_numero)}` : "Sin presupuestos todavía"}
+                {n.ultimo_numero > 0 ? `Último: ${codigoPresupuesto(n.ultimo_numero, n.anio)}` : "Sin presupuestos todavía"}
               </span>
             </li>
           ))}

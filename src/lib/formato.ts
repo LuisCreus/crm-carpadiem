@@ -47,9 +47,9 @@ export function formatoFechaHora(valor: string | Date | null | undefined): strin
   return `${formatoFecha(fecha)} ${hh}:${mi}`;
 }
 
-// "CD 078"
-export function codigoPresupuesto(numero: number): string {
-  return `CD ${String(numero).padStart(3, "0")}`;
+// "CD 078"; desde 2027 lleva el año: "CD 001/27"
+export function codigoPresupuesto(numero: number, anio?: number | null): string {
+  return `CD ${String(numero).padStart(3, "0")}${anio && anio >= 2027 ? `/${String(anio).slice(2)}` : ""}`;
 }
 
 // Lee un importe escrito a la española: "1.500", "3.973,80", "13246 €" → número (null si no se entiende)

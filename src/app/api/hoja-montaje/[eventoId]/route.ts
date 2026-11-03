@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { cargarDatosHoja, generarPdfHoja, nombreArchivoHoja } from "@/lib/hoja-montaje";
-// Generar documentos con Microsoft puede tardar: hasta 60 sexport const maxDuration = 60;
+// Generar documentos con Microsoft puede tardar: hasta 60 s
+export const maxDuration = 60;
 
 // Hoja de montaje en PDF, generada al momento (para descargar o compartir)
 export async function GET(request: NextRequest, { params }: RouteContext<"/api/hoja-montaje/[eventoId]">) {

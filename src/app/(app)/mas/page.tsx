@@ -8,7 +8,7 @@ import { obtenerUsuario } from "@/lib/auth";
 export default async function MasPage() {
   const usuario = await obtenerUsuario();
   const items = [
-    ...NAV_PRINCIPAL.filter((i) => !NAV_MOVIL.includes(i.href)),
+    ...NAV_PRINCIPAL.filter((i) => !NAV_MOVIL.includes(i.href) && (!i.soloAdmin || usuario.esAdmin)),
     ...NAV_SECUNDARIA.filter((i) => !i.soloAdmin || usuario.esAdmin),
   ];
 

@@ -120,8 +120,9 @@ export function DialogoCobro({ abierto, cerrar, presupuestoId, pendiente, reserv
           {pendiente !== null && <DialogDescription>Pendiente de cobro: {formatoEuros(pendiente)}</DialogDescription>}
         </DialogHeader>
         <form id="form-cobro" onSubmit={unaVez(guardar)} className="grid gap-4 sm:grid-cols-2">
-          <Campo id="cobro-importe" etiqueta="Importe (€)">
+          <Campo id="cobro-importe" etiqueta="Importe SIN IVA (€)">
             <Input id="cobro-importe" inputMode="decimal" autoFocus required value={importe} onChange={(e) => setImporte(e.target.value)} />
+            <span className="text-xs text-muted-foreground">Como el importe del presupuesto: si llegaron 1.210 € con IVA, escribe 1.000 €.</span>
           </Campo>
           <Campo id="cobro-fecha" etiqueta="Fecha">
             <Input id="cobro-fecha" type="date" required value={fecha} onChange={(e) => setFecha(e.target.value)} />

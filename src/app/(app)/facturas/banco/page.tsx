@@ -1,8 +1,10 @@
+import { exigirAdmin } from "@/lib/auth";
 import type { Metadata } from "next";
 import { PantallaBanco } from "./pantalla-banco";
 
 export const metadata: Metadata = { title: "Banco" };
 
-export default function BancoPage() {
+export default async function BancoPage() {
+  await exigirAdmin();
   return <PantallaBanco />;
 }

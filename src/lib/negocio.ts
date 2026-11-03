@@ -117,13 +117,17 @@ export function rutaCarpetaCliente(precision: PrecisionFecha, fecha: string | nu
 }
 
 // PRESUPUESTO CD 078 CARLOTA DURÁN V01.docx
-export function nombreArchivoPresupuesto(numero: number, cliente: string, version: number, extension: "docx" | "pdf"): string {
-  return `PRESUPUESTO CD ${String(numero).padStart(3, "0")} ${mayusculas(cliente)} V${dos(version)}.${extension}`;
+// En los nombres de archivo el año va con guion ("CD 001-27"): la barra no se admite
+const codigoArchivo = (numero: number, anio?: number | null) =>
+  `CD ${String(numero).padStart(3, "0")}${anio && anio >= 2027 ? `-${String(anio).slice(2)}` : ""}`;
+
+export function nombreArchivoPresupuesto(numero: number, cliente: string, version: number, extension: "docx" | "pdf", anio?: number | null): string {
+  return `PRESUPUESTO ${codigoArchivo(numero, anio)} ${mayusculas(cliente)} V${dos(version)}.${extension}`;
 }
 
 // HOJA DE MONTAJE CD 078 CARLOTA DURÁN.pdf
-export function nombreHojaMontaje(numero: number, cliente: string): string {
-  return `HOJA DE MONTAJE CD ${String(numero).padStart(3, "0")} ${mayusculas(cliente)}.pdf`;
+export function nombreHojaMontaje(numero: number, cliente: string, anio?: number | null): string {
+  return `HOJA DE MONTAJE ${codigoArchivo(numero, anio)} ${mayusculas(cliente)}.pdf`;
 }
 
 export function enlaceMaps(direccion: string): string {

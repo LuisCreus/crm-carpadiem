@@ -22,6 +22,8 @@ describe("formato", () => {
     expect(codigoPresupuesto(78)).toBe("CD 078");
     expect(codigoPresupuesto(13)).toBe("CD 013");
     expect(codigoPresupuesto(1234)).toBe("CD 1234");
+    expect(codigoPresupuesto(78, 2026)).toBe("CD 078");
+    expect(codigoPresupuesto(1, 2027)).toBe("CD 001/27");
   });
 });
 

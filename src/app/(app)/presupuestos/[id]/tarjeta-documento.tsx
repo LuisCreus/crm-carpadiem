@@ -119,7 +119,7 @@ export function TarjetaDocumento({ p, versiones }: { p: Presupuesto; versiones: 
       const { error: e2 } = await sb.from("presupuesto_versiones").update({
         pdf_storage: ruta,
         pdf_generado_at: new Date().toISOString(),
-        nombre_archivo: ultima.nombre_archivo ?? nombreArchivoPresupuesto(p.numero, cliente, ultima.version, "docx"),
+        nombre_archivo: ultima.nombre_archivo ?? nombreArchivoPresupuesto(p.numero, cliente, ultima.version, "docx", p.anio),
       }).eq("id", ultima.id);
       if (e2) return toast.error(e2.message);
       toast.success("PDF subido ✓ · escribe el importe con “Cambiar”");
@@ -139,7 +139,7 @@ export function TarjetaDocumento({ p, versiones }: { p: Presupuesto; versiones: 
 
   // Los importados conservan el nombre que ya tenían en SharePoint
   const nombreUltima = ultima?.nombre_archivo?.replace(/\.(docx|pdf)$/i, "")
-    ?? nombreArchivoPresupuesto(p.numero, cliente, ultima?.version ?? 1, "docx").replace(/\.docx$/, "");
+    ?? nombreArchivoPresupuesto(p.numero, cliente, ultima?.version ?? 1, "docx", p.anio).replace(/\.docx$/, "");
 
   return (
     <section className="rounded-xl border bg-card p-5">

@@ -26,6 +26,7 @@ import { TarjetaMontaje } from "./montaje";
 import { TarjetaFacturacion } from "./facturacion";
 import { TarjetaGastos } from "./gastos";
 import { TarjetaRentabilidad } from "./rentabilidad";
+import { useEsAdmin } from "@/components/usuario";
 import {
   TarjetaControlMaterial, TarjetaMaterialReservado, type ItemInventario, type MovimientoMaterial, type ReservaMaterial,
 } from "./material";
@@ -56,6 +57,7 @@ function Tarjeta({ titulo, accion, children }: { titulo: string; accion?: ReactN
 
 export function FichaEvento({ id }: { id: string }) {
   const listas = useListas();
+  const esAdmin = useEsAdmin();
   const [editar, setEditar] = useState(false);
   const [caido, setCaido] = useState(false);
   const [contacto, setContacto] = useState<Contacto | "nuevo" | null>(null);
@@ -224,7 +226,7 @@ export function FichaEvento({ id }: { id: string }) {
           </Tarjeta>
           <TarjetaFacturacion e={e} cobrado={cobrado} />
           <TarjetaGastos eventoId={e.id} />
-          <TarjetaRentabilidad eventoId={e.id} />
+          {esAdmin && <TarjetaRentabilidad eventoId={e.id} />}
           <TarjetaMontaje key={e.id + (e.montaje_inicio ?? "")} evento={e} contactos={contactos} montadoresAsignados={montadores} />
           <TarjetaMaterialReservado eventoId={e.id} reservas={reservas} inventario={inventario} solapes={solapes} />
           <TarjetaControlMaterial eventoId={e.id} movimientos={movimientos} inventario={inventario} />

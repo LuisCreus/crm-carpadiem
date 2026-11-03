@@ -4,7 +4,8 @@ import { crearClienteServidor } from "@/lib/supabase/server";
 import { uno, type DatosFacturacion } from "@/lib/datos/tipos";
 import { datosAlEmitir, pdfFactura } from "@/lib/facturas-pdf-servidor";
 import { hoyMadrid } from "@/lib/formato";
-// Generar documentos con Microsoft puede tardar: hasta 60 sexport const maxDuration = 60;
+// Generar documentos con Microsoft puede tardar: hasta 60 s
+export const maxDuration = 60;
 
 const FISCALES = "fact_nombre, fact_nif, fact_domicilio, fact_cp_ciudad, fact_email";
 

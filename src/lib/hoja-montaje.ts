@@ -10,6 +10,7 @@ import { diaSemana, enlaceMaps, nombreHojaMontaje, textoFechaEvento, type Precis
 
 export type DatosHoja = {
   numero: number | null;
+  anio: number | null;
   codigo: string | null;
   cliente: string;
   tipoEvento: string | null;
@@ -36,7 +37,7 @@ type Supabase = Awaited<ReturnType<typeof crearClienteServidor>>;
 export async function cargarDatosHoja(sb: Supabase, eventoId: string): Promise<DatosHoja | null> {
   const { data: e } = await sb
     .from("eventos")
-    .select("*, cliente:clientes(nombre), presupuesto:presupuestos(numero, codigo, sp_carpeta_ruta), tipo:tipos_evento(nombre), contacto:contactos!eventos_contacto_destino_id_fkey(nombre, telefono)")
+    .select("*, cliente:clientes(nombre), presupuesto:presupuestos(numero, anio, codigo, sp_carpeta_ruta), tipo:tipos_evento(nombre), contacto:contactos!eventos_contacto_destino_id_fkey(nombre, telefono)")
     .eq("id", eventoId)
     .maybeSingle();
   if (!e) return null;
@@ -44,9 +45,10 @@ export async function cargarDatosHoja(sb: Supabase, eventoId: string): Promise<D
     sb.from("evento_montadores").select("montador:montadores(nombre)").eq("evento_id", eventoId),
     sb.from("evento_material").select("cantidad, inventario:inventario(material, unidad)").eq("evento_id", eventoId),
   ]);
-  const presupuesto = uno(e.presupuesto) as { numero: number; codigo: string; sp_carpeta_ruta: string | null } | null;
+  const presupuesto = uno(e.presupuesto) as { numero: number; anio: number; codigo: string; sp_carpeta_ruta: string | null } | null;
   return {
     numero: presupuesto?.numero ?? null,
+    anio: presupuesto?.anio ?? null,
     codigo: presupuesto?.codigo ?? null,
     cliente: (uno(e.cliente) as { nombre: string } | null)?.nombre ?? "",
     tipoEvento: (uno(e.tipo) as { nombre: string } | null)?.nombre ?? null,
@@ -73,7 +75,7 @@ export async function cargarDatosHoja(sb: Supabase, eventoId: string): Promise<D
 }
 
 export function nombreArchivoHoja(d: DatosHoja): string {
-  return d.numero ? nombreHojaMontaje(d.numero, d.cliente) : `HOJA DE MONTAJE ${d.cliente.toLocaleUpperCase("es-ES")}.pdf`;
+  return d.numero ? nombreHojaMontaje(d.numero, d.cliente, d.anio) : `HOJA DE MONTAJE ${d.cliente.toLocaleUpperCase("es-ES")}.pdf`;
 }
 
 // ---------------------------------------------------------------------

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { FichaPresupuesto } from "./ficha-presupuesto";
-// Generar documentos con Microsoft puede tardar: hasta 60 sexport const maxDuration = 60;
+// Generar documentos con Microsoft puede tardar: hasta 60 s
+export const maxDuration = 60;
 
 export const metadata: Metadata = { title: "Presupuesto" };
 

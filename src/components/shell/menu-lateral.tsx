@@ -44,7 +44,7 @@ export function MenuLateral({ nombre, esAdmin }: { nombre: string; esAdmin: bool
         <span className="flex-1 text-left">Buscar</span>
         <kbd className="rounded border px-1 text-[11px]">Ctrl K</kbd>
       </button>
-      {NAV_PRINCIPAL.map((item) => <Enlace key={item.href} item={item} pathname={pathname} />)}
+      {NAV_PRINCIPAL.filter((i) => !i.soloAdmin || esAdmin).map((item) => <Enlace key={item.href} item={item} pathname={pathname} />)}
       <div className="grow" />
       {NAV_SECUNDARIA.filter((i) => !i.soloAdmin || esAdmin).map((item) => (
         <Enlace key={item.href} item={item} pathname={pathname} />

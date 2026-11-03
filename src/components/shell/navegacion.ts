@@ -12,7 +12,7 @@ export const NAV_PRINCIPAL: ItemNav[] = [
   { href: "/eventos", titulo: "Eventos", icono: Tent },
   { href: "/planificacion", titulo: "Planificación", icono: CalendarDays },
   { href: "/facturas", titulo: "Facturas", icono: Receipt },
-  { href: "/finanzas", titulo: "Finanzas", icono: TrendingUp },
+  { href: "/finanzas", titulo: "Finanzas", icono: TrendingUp, soloAdmin: true },
   { href: "/proveedores", titulo: "Contactos", icono: Users, tambien: ["/intermediarios"] },
   { href: "/inventario", titulo: "Inventario", icono: Boxes },
 ];

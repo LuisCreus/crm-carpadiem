@@ -3,12 +3,13 @@ import ExcelJS from "exceljs";
 import { obtenerUsuario } from "@/lib/auth";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { esNorma43, huella, leerCsv, leerHtml, leerNorma43, leerTabla, type Movimiento } from "@/lib/extracto-banco";
-// Generar documentos con Microsoft puede tardar: hasta 60 sexport const maxDuration = 60;
+// Generar documentos con Microsoft puede tardar: hasta 60 s
+export const maxDuration = 60;
 
 // Sube el extracto del Santander (Norma 43, Excel .xlsx, CSV o el ".xls" en HTML) y guarda
 // los movimientos nuevos. Los que ya estaban (misma huella) no se repiten.
 export async function POST(request: NextRequest) {
-  await obtenerUsuario();
+  if (!(await obtenerUsuario()).esAdmin) return NextResponse.json({ error: "Solo el administrador" }, { status: 403 });
   const archivo = (await request.formData()).get("archivo");
   if (!(archivo instanceof File)) return NextResponse.json({ error: "Falta el archivo" }, { status: 400 });
   if (archivo.size > 4 * 1024 * 1024) return NextResponse.json({ error: "El fichero pesa más de 4 MB: descarga menos meses" }, { status: 413 });

@@ -47,4 +47,14 @@ describe("refuerzos de seguridad", () => {
     const { rows } = await como(jimena, () => db.query<{ created_by: string }>("insert into public.clientes (nombre, created_by) values ('Y', $1) returning created_by", [luis]));
     expect(rows[0].created_by).toBe(jimena);
   });
+
+  it("código con año desde 2027 y facturas emitidas que no borra ni el administrador", async () => {
+    const c = (await db.query<{ id: string }>("insert into public.clientes (nombre) values ('Z') returning id")).rows[0].id;
+    const { rows } = await db.query<{ codigo: string }>(
+      "insert into public.presupuestos (cliente_id, anio, numero, fecha_precision) values ($1, 2026, 77, 'por_definir'), ($1, 2027, 1, 'por_definir') returning codigo", [c]);
+    expect(rows.map((r) => r.codigo)).toEqual(["CD 077", "CD 001/27"]);
+    const f = (await db.query<{ id: string }>("insert into public.facturas (importe, estado, anio, numero, fecha_emision) values (100, 'emitida', 2026, 900, '2026-11-01') returning id")).rows[0].id;
+    await expect(como(luis, () => db.query("select public.papelera_mover('facturas', $1)", [f]))).rejects.toThrow(/rectificativa/);
+    await expect(db.query("delete from public.facturas where id = $1", [f])).rejects.toThrow(/rectificativa/);
+  });
 });

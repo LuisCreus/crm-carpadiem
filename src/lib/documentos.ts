@@ -21,6 +21,7 @@ export type Resultado<T = object> = ({ ok: true } & T) | { ok: false; error: str
 type PresupuestoDoc = {
   id: string;
   numero: number;
+  anio: number;
   plantilla: "carpadiem" | "neutra";
   fecha_precision: PrecisionFecha;
   fecha_evento: string | null;
@@ -42,7 +43,7 @@ async function contexto(presupuestoId: string) {
   const sb = await crearClienteServidor();
   const { data, error } = await sb
     .from("presupuestos")
-    .select("id, numero, plantilla, fecha_precision, fecha_evento, fecha_fin, ubicacion, provincia, reserva_pct, sp_carpeta_id, sp_carpeta_ruta, oportunidad_id, cliente:clientes(nombre)")
+    .select("id, numero, anio, plantilla, fecha_precision, fecha_evento, fecha_fin, ubicacion, provincia, reserva_pct, sp_carpeta_id, sp_carpeta_ruta, oportunidad_id, cliente:clientes(nombre)")
     .eq("id", presupuestoId)
     .single();
   if (error || !data) throw new Error("Presupuesto no encontrado");
@@ -54,7 +55,7 @@ function valoresControles(p: PresupuestoDoc) {
     cliente: nombreCliente(p),
     fecha: textoFechaEvento(p.fecha_precision, p.fecha_evento, p.fecha_fin),
     ubicacion: [p.ubicacion, p.provincia].filter(Boolean).join(", "),
-    numero: codigoPresupuesto(p.numero),
+    numero: codigoPresupuesto(p.numero, p.anio),
   };
   if (p.reserva_pct !== null) valores.reserva = String(Number(p.reserva_pct)).replace(".", ",");
   return valores;
@@ -93,7 +94,7 @@ async function asegurarCarpetaPresupuesto(sb: Awaited<ReturnType<typeof crearCli
 }
 
 async function subirWord(sb: Awaited<ReturnType<typeof crearClienteServidor>>, p: PresupuestoDoc, ruta: string, version: number, docx: Uint8Array) {
-  const nombre = nombreArchivoPresupuesto(p.numero, nombreCliente(p), version, "docx");
+  const nombre = nombreArchivoPresupuesto(p.numero, nombreCliente(p), version, "docx", p.anio);
   const rutaArchivo = `${ruta}/${nombre}`;
   if (await elementoPorRuta(rutaArchivo)) {
     throw new Error(`Ya existe "${nombre}" en la carpeta. No lo sustituyo para no perder cambios.`);
@@ -164,7 +165,7 @@ export async function crearVersionDocumento(presupuestoId: string): Promise<Resu
     const { data: max } = await sb.from("presupuesto_versiones").select("version")
       .eq("presupuesto_id", p.id).order("version", { ascending: false }).limit(1).single();
     const siguiente = (max?.version ?? 0) + 1;
-    const nombre = nombreArchivoPresupuesto(p.numero, nombreCliente(p), siguiente, "docx");
+    const nombre = nombreArchivoPresupuesto(p.numero, nombreCliente(p), siguiente, "docx", p.anio);
     if (await elementoPorRuta(`${ruta}/${nombre}`)) throw new Error(`Ya existe "${nombre}" en la carpeta. No lo sustituyo para no perder cambios.`);
 
     const { data: nueva, error } = await sb.rpc("nueva_version", { p_id: p.id });
@@ -195,7 +196,7 @@ export async function generarPdf(presupuestoId: string, forzar = false): Promise
 
     const [pdf, docx] = await Promise.all([descargarComoPdf(item.id), descargar(item.id)]);
     const rutaPdf = (v.docx_ruta as string | null)?.replace(/\.docx$/i, ".pdf")
-      ?? `${rutaReal(rutaCarpetaCliente(p.fecha_precision, p.fecha_evento, nombreCliente(p)))}/${nombreArchivoPresupuesto(p.numero, nombreCliente(p), v.version, "pdf")}`;
+      ?? `${rutaReal(rutaCarpetaCliente(p.fecha_precision, p.fecha_evento, nombreCliente(p)))}/${nombreArchivoPresupuesto(p.numero, nombreCliente(p), v.version, "pdf", p.anio)}`;
     const subido = await subir(rutaPdf, pdf, TIPO_PDF);
     const { total, reservaPct } = await leerImporte(docx);
     const { error } = await sb.from("presupuesto_versiones")

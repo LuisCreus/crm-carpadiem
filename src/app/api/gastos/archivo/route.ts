@@ -3,7 +3,8 @@ import { obtenerUsuario } from "@/lib/auth";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { asegurarCarpeta, descargar, elementoPorRuta, rutaReal, sharepointConfigurado, subir } from "@/lib/graph/sharepoint";
 import { limpiarNombre } from "@/lib/negocio";
-// Generar documentos con Microsoft puede tardar: hasta 60 sexport const maxDuration = 60;
+// Generar documentos con Microsoft puede tardar: hasta 60 s
+export const maxDuration = 60;
 
 // Facturas que nos llegan: se guardan donde las dejáis para la gestoría
 const CARPETA_RECIBIDAS = "CARPA DIEM/03. FINANCIERO/01. FACTURAS/01. PENDIENTE SARA/02. RECIBIDAS";

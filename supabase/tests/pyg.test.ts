@@ -41,9 +41,9 @@ describe("P&L: CAPEX y datos a mano", () => {
     expect(await activosDe(id)).toEqual([]);
   });
 
-  it("todos lo ven, solo el administrador lo cambia", async () => {
-    const ver = await como(jimena, () => db.query("select 1 from public.activos"));
-    expect(ver.rows.length).toBe(9);
+  it("solo el administrador lo ve y lo cambia", async () => {
+    expect((await como(jimena, () => db.query("select 1 from public.activos"))).rows).toHaveLength(0);
+    expect((await como(luis, () => db.query("select 1 from public.activos"))).rows).toHaveLength(9);
     await expect(como(jimena, () => db.query("insert into public.pyg_manual (mes, concepto, importe) values ('2026-10-01', 'bonus', 500)")))
       .rejects.toThrow(/row-level security/);
     await como(luis, () => db.query("insert into public.pyg_manual (mes, concepto, importe) values ('2026-10-01', 'bonus', 500)"));

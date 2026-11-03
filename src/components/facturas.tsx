@@ -19,6 +19,7 @@ import { ESTADOS_FACTURA, TIPOS_FACTURA, conceptoAlEmitir, textoCorreoFactura, t
 import { formatoEuros, formatoFecha, hoyMadrid, leerEuros } from "@/lib/formato";
 import { generarPdfFactura } from "@/lib/facturas-pdf";
 import { estadoCorreo, prepararCorreoFactura } from "@/lib/correo-facturas";
+import { useEsAdmin } from "@/components/usuario";
 
 // Emitida y todavía sin enviar al cliente
 export const porEnviar = (f: Pick<Factura, "estado" | "correo_preparado_at">) => f.estado === "emitida" && !f.correo_preparado_at;
@@ -176,6 +177,7 @@ export function DialogoFactura({ cerrar, factura, eventoId, clienteId, inicial }
 
 // Botones de una factura según su estado: Emitir · Marcar pagada · Deshacer pago · Editar · Quitar
 export function AccionesFactura({ f, datos, editar }: { f: Factura; datos: DatosFacturacion; editar?: () => void }) {
+  const esAdmin = useEsAdmin();
   const [dialogo, setDialogo] = useState<"emitir" | "pagar" | "datos" | "correo" | null>(null);
   const [fechaPago, setFechaPago] = useState(hoyMadrid());
   const faltanDatos = !datos.fact_nombre || !datos.fact_nif;
@@ -235,7 +237,7 @@ export function AccionesFactura({ f, datos, editar }: { f: Factura; datos: Datos
     setOcupado(false);
     if (r.ok) {
       toast.success(`${r.nombre} guardada en PENDIENTE SARA ✓ · ahora, envíala al cliente`, { id, duration: 8000 });
-      setDialogo("correo");
+      if (esAdmin) setDialogo("correo");
     }
     else toast.error(`Factura ${data as string} emitida, pero el PDF no: ${r.error}. Pulsa “Generar PDF”.`, { id, duration: 15000 });
   }
@@ -322,9 +324,9 @@ export function AccionesFactura({ f, datos, editar }: { f: Factura; datos: Datos
           </Button>
           {porEnviar(f) ? (
             <>
-              <Button size="sm" onClick={() => setDialogo("correo")}>
+              {esAdmin && <Button size="sm" onClick={() => setDialogo("correo")}>
                 <Mail className="size-3.5" aria-hidden /> Enviar por correo
-              </Button>
+              </Button>}
               <Button size="sm" variant="ghost" onClick={marcarEnviada}>Ya enviada</Button>
             </>
           ) : (
