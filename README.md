@@ -25,6 +25,7 @@ CRM web de CARPADIEM IBÉRICA S.L. para gestionar leads, presupuestos (con la pl
 | 15 | Pagos a proveedores: fichero SEPA XML para Santander Empresas; Contactos (proveedores + intermediarios) | Hecha |
 | 16 | Rentabilidad por evento (mes a mes) y «Pasar a la gestoría» por trimestre (mueve PDF, Excel resumen, borrador en Outlook) | Hecha |
 | 17 | Conciliar con el banco: se sube el extracto del Santander (Norma 43, Excel o CSV) y cada movimiento se enlaza con su factura, se apunta como gasto (con reglas que se recuerdan) o se ignora | Hecha |
+| 18 | P&L en el CRM: mes a mes por tipo de evento, costes variables y fijos, personal e intereses a mano, CAPEX con amortización desde la compra, EBITDA, EBIT, IS y beneficio neto | Hecha |
 
 ## Piezas
 
