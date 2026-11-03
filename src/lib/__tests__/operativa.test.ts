@@ -129,6 +129,20 @@ describe("avisos de facturas", () => {
   });
 });
 
+describe("avisos de pagos a proveedores", () => {
+  const g = (vencimiento: string | null) => ({ id: "g", proveedor: "David Mendoza", total: 1060, vencimiento, estado: "pendiente" });
+  const avisos = (gastos: ReturnType<typeof g>[]) =>
+    calcularAvisos("2026-11-03", { presupuestos: [], eventos: [], leads: [], gastos }, { diasSeguimiento: 7, diasLimiteSeguro: 10, diasAvisoSeguro: 3, diasAvisoPago: 3 })
+      .filter((a) => a.tipo === "pago").map((a) => a.detalle);
+
+  it("avisa desde 3 días antes del vencimiento y de las vencidas", () => {
+    expect(avisos([g("2026-11-10")])).toEqual([]);
+    expect(avisos([g("2026-11-05")])).toEqual(["Vence el 05/11/2026 · 1.060 €"]);
+    expect(avisos([g("2026-10-30")])).toEqual(["Vencida el 30/10/2026 · 1.060 €"]);
+    expect(avisos([g(null)])).toEqual([]);
+  });
+});
+
 describe("números del Inicio", () => {
   const p = (estado: string, enviado: string | null, importe: number, reserva = 30, cobrado = 0) =>
     ({ estado: estado as never, enviado_at: enviado, importe, reserva_pct: reserva, cobrado });

@@ -13,7 +13,7 @@ import {
 } from "@/lib/graph/sharepoint";
 
 export async function cargarDatosCopia(sb: SupabaseClient): Promise<DatosCopia> {
-  const [pr, ev, le, co, mv, te, ca, fa] = await Promise.all([
+  const [pr, ev, le, co, mv, te, ca, fa, ga, cg] = await Promise.all([
     sb.from("presupuestos").select("*, cliente:clientes(nombre), comercial:comerciales(nombre), intermediario:intermediarios(nombre)")
       .is("deleted_at", null).order("anio").order("numero"),
     sb.from("eventos").select("*, cliente:clientes(nombre), presupuesto:presupuestos(codigo)").is("deleted_at", null).order("fecha_inicio"),
@@ -24,8 +24,11 @@ export async function cargarDatosCopia(sb: SupabaseClient): Promise<DatosCopia> 
     sb.from("canales_lead").select("codigo, nombre"),
     sb.from("facturas").select("*, evento:eventos(cliente:clientes(nombre))").is("deleted_at", null)
       .order("anio", { nullsFirst: false }).order("numero", { nullsFirst: false }),
+    sb.from("facturas_recibidas").select("*, proveedor:proveedores(nombre, nif), evento:eventos(cliente:clientes(nombre))").is("deleted_at", null).order("fecha"),
+    sb.from("categorias_gasto").select("codigo, nombre"),
   ]);
-  for (const r of [pr, ev, le, co, mv, fa]) if (r.error) throw new Error(r.error.message);
+  for (const r of [pr, ev, le, co, mv, fa, ga]) if (r.error) throw new Error(r.error.message);
+  const categorias = new Map((cg.data ?? []).map((c) => [c.codigo, c.nombre]));
 
   const tipos = new Map((te.data ?? []).map((t) => [t.codigo, t.nombre]));
   const canales = new Map((ca.data ?? []).map((t) => [t.codigo, t.nombre]));
@@ -60,6 +63,15 @@ export async function cargarDatosCopia(sb: SupabaseClient): Promise<DatosCopia> 
         estado: ESTADOS_FACTURA[f.estado as keyof typeof ESTADOS_FACTURA]?.texto ?? f.estado,
         tipo: TIPOS_FACTURA[f.tipo as keyof typeof TIPOS_FACTURA] ?? f.tipo,
         evento: (uno(e?.cliente) as { nombre: string } | null)?.nombre,
+      };
+    }),
+    gastos: (ga.data ?? []).map((g) => {
+      const p = uno(g.proveedor) as { nombre: string; nif: string | null } | null;
+      const e = uno(g.evento) as { cliente: unknown } | null;
+      return {
+        ...g, proveedor: p?.nombre, nif: p?.nif, estado: g.estado === "pagada" ? "Pagada" : "Por pagar",
+        evento: (uno(e?.cliente) as { nombre: string } | null)?.nombre ?? "Gasto general",
+        categoria: categorias.get(g.categoria) ?? g.categoria,
       };
     }),
     material: (mv.data ?? []).map((m) => {

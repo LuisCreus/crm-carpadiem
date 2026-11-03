@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { rangoOcupacion, solapesMaterial, type EventoOcupacion, type Solape } from "@/lib/operativa";
 import { TarjetaMontaje } from "./montaje";
 import { TarjetaFacturacion } from "./facturacion";
+import { TarjetaGastos } from "./gastos";
 import {
   TarjetaControlMaterial, TarjetaMaterialReservado, type ItemInventario, type MovimientoMaterial, type ReservaMaterial,
 } from "./material";
@@ -213,6 +214,7 @@ export function FichaEvento({ id }: { id: string }) {
             )}
           </Tarjeta>
           <TarjetaFacturacion e={e} cobrado={cobrado} />
+          <TarjetaGastos eventoId={e.id} />
           <TarjetaMontaje key={e.id + (e.montaje_inicio ?? "")} evento={e} contactos={contactos} montadoresAsignados={montadores} />
           <TarjetaMaterialReservado eventoId={e.id} reservas={reservas} inventario={inventario} solapes={solapes} />
           <TarjetaControlMaterial eventoId={e.id} movimientos={movimientos} inventario={inventario} />

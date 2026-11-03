@@ -10,6 +10,7 @@ import { SELECT_FACTURA, aFactura, uno, type DatosFacturacion, type Factura } fr
 import { totalFactura } from "@/lib/facturacion";
 import { formatoEuros, hoyMadrid } from "@/lib/formato";
 import { cn } from "@/lib/utils";
+import { PestanasFacturas } from "./pestanas";
 
 type FacturaLista = Factura & {
   evento: (DatosFacturacion & { id: string; cliente: ({ nombre: string } & DatosFacturacion) | null; presupuesto: { codigo: string } | null }) | null;
@@ -51,6 +52,7 @@ export function ListaFacturas() {
   return (
     <>
       <Cabecera titulo="Facturas" subtitulo="Lo que falta por facturar y por cobrar, con la numeración CD AAAA/n" />
+      <PestanasFacturas activa="emitidas" />
 
       <div className="mb-5 grid gap-3 sm:grid-cols-3">
         {([

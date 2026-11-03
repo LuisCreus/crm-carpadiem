@@ -1,6 +1,6 @@
 import type { EstadoPresupuesto, PrecisionFecha } from "@/lib/negocio";
 
-export type Opcion = { codigo: string; nombre: string; reserva_pct?: number | null };
+export type Opcion = { codigo: string; nombre: string; reserva_pct?: number | null; tipo?: string };
 export type Comercial = { id: string; nombre: string };
 export type IntermediarioCorto = { id: string; nombre: string; comision_pct: number | null };
 
@@ -172,4 +172,45 @@ export function aNumero(valor: unknown): number | null {
   if (valor === null || valor === undefined || valor === "") return null;
   const n = Number(valor);
   return Number.isNaN(n) ? null : n;
+}
+
+// ---------------------------------------------------------------------
+// Facturas recibidas (gastos) y proveedores
+// ---------------------------------------------------------------------
+export type Proveedor = { id: string; nombre: string; nif: string | null; iban: string | null; email: string | null; categoria: string | null };
+
+export type FacturaRecibida = {
+  id: string;
+  proveedor_id: string | null;
+  numero: string | null;
+  fecha: string;
+  vencimiento: string | null;
+  concepto: string | null;
+  evento_id: string | null;
+  categoria: string | null;
+  base: number;
+  iva_pct: number;
+  irpf_pct: number;
+  total: number;
+  iban: string | null;
+  estado: "pendiente" | "pagada";
+  fecha_pago: string | null;
+  archivo_item_id: string | null;
+  archivo_nombre: string | null;
+  comentarios: string | null;
+  proveedor: { id: string; nombre: string; nif: string | null } | null;
+  evento: { id: string; fecha_inicio: string | null; cliente: { nombre: string } | null } | null;
+};
+
+export const SELECT_FACTURA_RECIBIDA =
+  "id, proveedor_id, numero, fecha, vencimiento, concepto, evento_id, categoria, base, iva_pct, irpf_pct, total, iban, estado, fecha_pago, archivo_item_id, archivo_nombre, comentarios, proveedor:proveedores(id, nombre, nif), evento:eventos(id, fecha_inicio, cliente:clientes(nombre))";
+
+export function aFacturaRecibida(f: Record<string, unknown>): FacturaRecibida {
+  const ev = uno(f.evento) as (FacturaRecibida["evento"] & { cliente: unknown }) | null;
+  return {
+    ...(f as FacturaRecibida),
+    base: Number(f.base), iva_pct: Number(f.iva_pct), irpf_pct: Number(f.irpf_pct), total: Number(f.total),
+    proveedor: uno(f.proveedor) as FacturaRecibida["proveedor"],
+    evento: ev && { ...ev, cliente: uno(ev.cliente) as { nombre: string } | null },
+  };
 }

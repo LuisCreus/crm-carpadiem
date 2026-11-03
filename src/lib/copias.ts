@@ -1,5 +1,5 @@
 // Copia de seguridad del CRM en Excel: una foto para consultar, no para editar.
-// Hojas: Presupuestos, Eventos, Leads, Cobros, Facturas y Material.
+// Hojas: Presupuestos, Eventos, Leads, Cobros, Facturas, Gastos y Material.
 
 import ExcelJS from "exceljs";
 
@@ -10,6 +10,7 @@ export type DatosCopia = {
   leads: Fila[];
   cobros: Fila[];
   facturas: Fila[];
+  gastos: Fila[];
   material: Fila[];
 };
 
@@ -105,6 +106,26 @@ const HOJAS: { nombre: string; clave: keyof DatosCopia; columnas: Columna[] }[] 
       { titulo: "Total", clave: "total", ancho: 12, tipo: "euros" },
       { titulo: "Fecha de pago", clave: "fecha_pago", ancho: 13, tipo: "fecha" },
       { titulo: "Email", clave: "fact_email", ancho: 28 },
+    ],
+  },
+  {
+    nombre: "Gastos", clave: "gastos", columnas: [
+      { titulo: "Estado", clave: "estado", ancho: 11 },
+      { titulo: "Fecha", clave: "fecha", ancho: 12, tipo: "fecha" },
+      { titulo: "Proveedor", clave: "proveedor", ancho: 28 },
+      { titulo: "NIF", clave: "nif", ancho: 13 },
+      { titulo: "Nº factura", clave: "numero", ancho: 13 },
+      { titulo: "Evento", clave: "evento", ancho: 28 },
+      { titulo: "Categoría", clave: "categoria", ancho: 20 },
+      { titulo: "Concepto", clave: "concepto", ancho: 32 },
+      { titulo: "Base", clave: "base", ancho: 12, tipo: "euros" },
+      { titulo: "IVA %", clave: "iva_pct", ancho: 7, tipo: "numero" },
+      { titulo: "IRPF %", clave: "irpf_pct", ancho: 7, tipo: "numero" },
+      { titulo: "Total", clave: "total", ancho: 12, tipo: "euros" },
+      { titulo: "Vencimiento", clave: "vencimiento", ancho: 12, tipo: "fecha" },
+      { titulo: "Fecha de pago", clave: "fecha_pago", ancho: 13, tipo: "fecha" },
+      { titulo: "IBAN", clave: "iban", ancho: 30 },
+      { titulo: "Archivo", clave: "archivo_nombre", ancho: 30 },
     ],
   },
   {

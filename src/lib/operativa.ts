@@ -120,7 +120,7 @@ function cantidadDe(e: EventoOcupacion, inventarioId: string) {
 // Avisos (Inicio)
 // ---------------------------------------------------------------------
 
-export type TipoAviso = "seguimiento" | "accion_lead" | "montaje" | "desmontaje" | "seguro" | "cobro" | "factura" | "factura_cobro";
+export type TipoAviso = "seguimiento" | "accion_lead" | "montaje" | "desmontaje" | "seguro" | "cobro" | "factura" | "factura_cobro" | "pago";
 export type Aviso = { tipo: TipoAviso; fecha: string; titulo: string; detalle: string; href: string; urgente: boolean };
 
 export type PresupuestoAvisos = {
@@ -141,14 +141,15 @@ export type LeadAvisos = { id: string; cliente_nombre: string; estado: string; p
 
 export type AjustesAvisos = {
   diasSeguimiento: number; diasLimiteSeguro: number; diasAvisoSeguro: number;
-  diasAvisoResto?: number; diasAvisoCobroFactura?: number;
+  diasAvisoResto?: number; diasAvisoCobroFactura?: number; diasAvisoPago?: number;
 };
+export type GastoAvisos = { id: string; proveedor: string; total: number; vencimiento: string | null; estado: string };
 
 const hora = (fechaHora: string) => new Date(fechaHora).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" });
 
 export function calcularAvisos(
   hoy: string,
-  datos: { presupuestos: PresupuestoAvisos[]; eventos: EventoAvisos[]; leads: LeadAvisos[]; facturas?: FacturaAvisos[] },
+  datos: { presupuestos: PresupuestoAvisos[]; eventos: EventoAvisos[]; leads: LeadAvisos[]; facturas?: FacturaAvisos[]; gastos?: GastoAvisos[] },
   ajustes: AjustesAvisos,
 ): Aviso[] {
   const avisos: Aviso[] = [];
@@ -195,6 +196,14 @@ export function calcularAvisos(
   }
 
   avisos.push(...avisosFacturas(hoy, datos.eventos, datos.facturas ?? [], ajustes));
+
+  // Facturas de proveedores que vencen pronto o ya han vencido
+  for (const g of datos.gastos ?? []) {
+    if (g.estado !== "pendiente" || !g.vencimiento) continue;
+    if (sumarDias(g.vencimiento, -(ajustes.diasAvisoPago ?? 3)) > hoy) continue;
+    avisos.push({ tipo: "pago", fecha: g.vencimiento, titulo: g.proveedor, href: "/facturas/recibidas", urgente: g.vencimiento <= hoy,
+      detalle: `${g.vencimiento < hoy ? "Vencida el" : "Vence el"} ${formatoCorto(g.vencimiento)} · ${euros(g.total)}` });
+  }
   return avisos.sort((a, b) => Number(b.urgente) - Number(a.urgente) || a.fecha.localeCompare(b.fecha));
 }
 
