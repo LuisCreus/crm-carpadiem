@@ -122,10 +122,12 @@ describe("avisos de facturas", () => {
     expect(avisos([ev("c", "2026-12-01")], [fa("c", "reserva", "emitida", "2026-10-18")])[0].tipo).toBe("factura_cobro");
   });
 
-  it("mensualidad del mes sin factura en los proyectos de larga duración", () => {
-    const p = ev("p", "2026-06-01", { es_larga_duracion: true, cuota_mensual: 670 });
-    expect(avisos([p], [fa("p", "mensualidad", "emitida", "2026-10-27")])[0].detalle).toBe("Mensualidad de este mes por emitir · 670 €");
-    expect(avisos([p], [fa("p", "mensualidad", "emitida", "2026-11-01")])).toHaveLength(0);
+  it("carpa de temporada: avisa de las mensualidades sin emitir y de la del mes a final de mes", () => {
+    const p = ev("p", "2026-06-01", { es_larga_duracion: true, fecha_fin: "2026-11-30", cuotas: [{ desde: "2026-06", importe: 670 }, { desde: "2026-10", importe: 480 }] });
+    const emitidas = (n: number) => Array.from({ length: n }, (_, i) => ({ ...fa("p", "mensualidad", "pagada", "2026-07-10"), id: "m" + i }));
+    // Hoy 2 de noviembre: junio-octubre emitidas → nada; con 4 emitidas falta octubre (480 €)
+    expect(avisos([p], emitidas(5))).toHaveLength(0);
+    expect(avisos([p], emitidas(4)).map((a) => a.detalle)).toEqual(["Mensualidad de octubre de 2026 sin emitir · 480 €"]);
   });
 });
 

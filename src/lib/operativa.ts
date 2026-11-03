@@ -2,6 +2,7 @@
 // Funciones puras (sin base de datos) para poder probarlas con tests.
 
 import { avisarSeguro, fechaLimiteSeguro, type EstadoPresupuesto, type PrecisionFecha } from "@/lib/negocio";
+import { cuotaDelMes, mensualidadesPendientes, nombreMes, ultimoDia, type Cuota } from "@/lib/cuotas";
 
 // ---------------------------------------------------------------------
 // Fechas
@@ -131,7 +132,7 @@ export type EventoAvisos = {
   fecha_precision: PrecisionFecha; fecha_inicio: string | null; fecha_fin: string | null;
   montaje_inicio: string | null; desmontaje_inicio: string | null;
   importe: number | null; cobrado: number; ubicacion: string | null;
-  es_larga_duracion?: boolean; cuota_mensual?: number | null;
+  es_larga_duracion?: boolean; cuota_mensual?: number | null; cuotas?: Cuota[];
 };
 export type FacturaAvisos = {
   id: string; evento_id: string | null; tipo: string; estado: string; importe: number;
@@ -245,13 +246,18 @@ function avisosFacturas(hoy: string, eventos: EventoAvisos[], facturas: FacturaA
       }
     }
   }
-  // Mensualidad del mes en curso sin factura
-  const mes = hoy.slice(0, 7);
+  // Carpas de temporada: la mensualidad se factura a final de cada mes (aviso desde 5 días antes)
   for (const e of eventos) {
-    if (e.estado !== "activo" || !e.es_larga_duracion || !e.cuota_mensual) continue;
-    const hecha = facturas.some((f) => f.evento_id === e.id && f.tipo === "mensualidad" && (f.estado === "prevista" || f.fecha_emision?.startsWith(mes)));
-    if (!hecha) {
-      avisos.push({ tipo: "factura", fecha: `${mes}-01`, titulo: e.cliente, detalle: `Mensualidad de este mes por emitir · ${euros(e.cuota_mensual)}`, href: `/eventos/${e.id}`, urgente: true });
+    if (e.estado !== "activo" || !e.es_larga_duracion || !e.fecha_inicio) continue;
+    const emitidas = facturas.filter((f) => f.evento_id === e.id && f.tipo === "mensualidad" && f.estado !== "prevista").length;
+    for (const mes of mensualidadesPendientes(e.fecha_inicio, e.fecha_fin, hoy, emitidas)) {
+      const cuota = cuotaDelMes(e.cuotas ?? [], mes, e.cuota_mensual ?? null);
+      const fin = ultimoDia(mes);
+      const actual = mes === hoy.slice(0, 7);
+      avisos.push({
+        tipo: "factura", fecha: fin, titulo: e.cliente, href: `/eventos/${e.id}`, urgente: !actual || hoy >= fin,
+        detalle: `Mensualidad de ${nombreMes(mes)} ${actual ? "por emitir a final de mes" : "sin emitir"}${cuota ? ` · ${euros(cuota)}` : ""}`,
+      });
     }
   }
   return avisos;

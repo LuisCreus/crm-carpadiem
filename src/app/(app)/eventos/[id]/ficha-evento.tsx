@@ -4,7 +4,8 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { MapPin, Phone } from "lucide-react";
+import { Mail, MapPin, Pencil, Phone } from "lucide-react";
+import { DialogoContacto } from "@/app/(app)/presupuestos/[id]/dialogos";
 import { Campo, claseSelect } from "@/components/campo";
 import { Etiqueta, EtiquetaEstado, CLASE_CONFIRMADO, CLASE_SEGURO } from "@/components/etiqueta-estado";
 import { HistorialDialogo } from "@/components/historial-dialogo";
@@ -16,7 +17,8 @@ import { useTablaEnVivo } from "@/hooks/use-tabla-en-vivo";
 import { nombreDe, useListas } from "@/hooks/use-listas";
 import { crearClienteNavegador } from "@/lib/supabase/client";
 import { SELECT_EVENTO, uno, type Contacto, type Evento } from "@/lib/datos/tipos";
-import { formatoEuros, formatoFecha, leerEuros } from "@/lib/formato";
+import { formatoEuros, formatoFecha, hoyMadrid, leerEuros } from "@/lib/formato";
+import { cuotaDelMes } from "@/lib/cuotas";
 import { diaSemana, enlaceMaps, fechaLimiteSeguro, textoFechaEvento, type PrecisionFecha } from "@/lib/negocio";
 import { cn } from "@/lib/utils";
 import { rangoOcupacion, solapesMaterial, type EventoOcupacion, type Solape } from "@/lib/operativa";
@@ -56,6 +58,7 @@ export function FichaEvento({ id }: { id: string }) {
   const listas = useListas();
   const [editar, setEditar] = useState(false);
   const [caido, setCaido] = useState(false);
+  const [contacto, setContacto] = useState<Contacto | "nuevo" | null>(null);
   const { datos, cargando } = useTablaEnVivo<Datos>(
     ["eventos", "cobros", "contactos", "clientes", "presupuestos", "evento_montadores", "material_movimientos", "evento_material", "inventario"],
     async (sb) => {
@@ -185,8 +188,8 @@ export function FichaEvento({ id }: { id: string }) {
               </div>
             </div>
           </Tarjeta>
-          <Tarjeta titulo="Contactos">
-            {contactos.length === 0 && <p className="text-sm text-muted-foreground">Sin contactos.</p>}
+          <Tarjeta titulo="Contactos" accion={<Button size="sm" variant="outline" onClick={() => setContacto("nuevo")}>+ Añadir</Button>}>
+            {contactos.length === 0 && <p className="text-sm text-muted-foreground">Sin contactos. Añade la persona con la que habláis.</p>}
             {contactos.map((c) => (
               <div key={c.id} className="flex items-center gap-3 border-t py-2.5 first:border-0">
                 <div className="min-w-0 flex-1 text-sm">
@@ -194,6 +197,8 @@ export function FichaEvento({ id }: { id: string }) {
                   <div className="text-[13px] text-muted-foreground">{[c.telefono, c.email].filter(Boolean).join(" · ")}</div>
                 </div>
                 {c.telefono && <Button variant="ghost" size="icon" aria-label={`Llamar a ${c.nombre}`} render={<a href={`tel:${c.telefono}`} />}><Phone className="size-4" aria-hidden /></Button>}
+                {c.email && <Button variant="ghost" size="icon" aria-label={`Escribir a ${c.nombre}`} render={<a href={`mailto:${c.email}`} />}><Mail className="size-4" aria-hidden /></Button>}
+                <Button variant="ghost" size="icon" aria-label={`Editar ${c.nombre}`} onClick={() => setContacto(c)}><Pencil className="size-4" aria-hidden /></Button>
               </div>
             ))}
           </Tarjeta>
@@ -225,6 +230,9 @@ export function FichaEvento({ id }: { id: string }) {
 
       {editar && <DialogoEditarEvento evento={e} cerrar={() => setEditar(false)} />}
       {caido && <DialogoCaido evento={e} cobrado={cobrado} cerrar={() => setCaido(false)} />}
+      {contacto && (
+        <DialogoContacto abierto clienteId={e.cliente_id} contacto={contacto === "nuevo" ? undefined : contacto} cerrar={() => setContacto(null)} />
+      )}
     </>
   );
 }
@@ -306,8 +314,22 @@ function DialogoEditarEvento({ evento: e, cerrar }: { evento: Evento; cerrar: ()
     maps_url: e.maps_url ?? "",
     material: e.material ?? "",
     comentarios: e.comentarios ?? "",
-    cuota_mensual: e.cuota_mensual !== null ? String(e.cuota_mensual).replace(".", ",") : "",
   });
+  // Carpa de temporada: tramos de cuota ("desde junio, 670 €; desde septiembre, 480 €")
+  const [cuotas, setCuotas] = useState(() => {
+    const t = (e.cuotas ?? []).map((x) => ({ desde: x.desde, importe: String(x.importe).replace(".", ",") }));
+    if (!t.length && e.cuota_mensual !== null) t.push({ desde: (e.fecha_inicio ?? hoyMadrid()).slice(0, 7), importe: String(e.cuota_mensual).replace(".", ",") });
+    return t;
+  });
+
+  function cuotasParaGuardar() {
+    const lista = cuotas
+      .map((t) => ({ desde: t.desde, importe: leerEuros(t.importe) }))
+      .filter((t): t is { desde: string; importe: number } => Boolean(t.desde) && t.importe !== null)
+      .sort((a, b) => a.desde.localeCompare(b.desde));
+    // cuota_mensual: la de este mes (para los avisos y la mensualidad)
+    return { cuotas: lista, cuota_mensual: cuotaDelMes(lista, hoyMadrid().slice(0, 7), lista[0]?.importe ?? null) };
+  }
 
   async function guardar(ev: FormEvent) {
     ev.preventDefault();
@@ -322,7 +344,7 @@ function DialogoEditarEvento({ evento: e, cerrar }: { evento: Evento; cerrar: ()
       maps_url: c.maps_url.trim() || null,
       material: c.material.trim() || null,
       comentarios: c.comentarios.trim() || null,
-      ...(e.es_larga_duracion ? { cuota_mensual: leerEuros(c.cuota_mensual) } : {}),
+      ...(e.es_larga_duracion ? cuotasParaGuardar() : {}),
     }).eq("id", e.id);
     if (error) return toast.error(error.message);
     toast.success("Guardado ✓");
@@ -366,9 +388,23 @@ function DialogoEditarEvento({ evento: e, cerrar }: { evento: Evento; cerrar: ()
           </Campo>
           <Campo id="e-mat" etiqueta="Material" className="sm:col-span-2"><Textarea id="e-mat" rows={2} value={c.material} onChange={(x) => setC({ ...c, material: x.target.value })} /></Campo>
           {e.es_larga_duracion && (
-            <Campo id="e-cuota" etiqueta="Cuota mensual sin IVA (€)">
-              <Input id="e-cuota" inputMode="decimal" value={c.cuota_mensual} onChange={(x) => setC({ ...c, cuota_mensual: x.target.value })} />
-            </Campo>
+            <div className="grid gap-2 sm:col-span-2">
+              <div className="text-sm font-medium">Cuota mensual sin IVA</div>
+              <p className="text-[13px] text-muted-foreground">La temporada son las fechas de inicio y fin. Si la cuota cambia a partir de un mes, añade otro tramo.</p>
+              {cuotas.map((t, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Desde</span>
+                  <Input type="month" aria-label="Desde el mes" className="w-40" value={t.desde}
+                    onChange={(x) => setCuotas(cuotas.map((y, j) => (j === i ? { ...y, desde: x.target.value } : y)))} />
+                  <Input inputMode="decimal" aria-label="Cuota en euros" className="w-28" value={t.importe}
+                    onChange={(x) => setCuotas(cuotas.map((y, j) => (j === i ? { ...y, importe: x.target.value } : y)))} />
+                  <span className="text-sm text-muted-foreground">€/mes</span>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setCuotas(cuotas.filter((_, j) => j !== i))}>Quitar</Button>
+                </div>
+              ))}
+              <Button type="button" variant="outline" size="sm" className="justify-self-start"
+                onClick={() => setCuotas([...cuotas, { desde: hoyMadrid().slice(0, 7), importe: "" }])}>+ Cambio de cuota</Button>
+            </div>
           )}
           <Campo id="e-com" etiqueta="Comentarios" className="sm:col-span-2"><Textarea id="e-com" rows={3} value={c.comentarios} onChange={(x) => setC({ ...c, comentarios: x.target.value })} /></Campo>
         </form>

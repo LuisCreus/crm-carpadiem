@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useListas } from "@/hooks/use-listas";
 import { crearClienteNavegador } from "@/lib/supabase/client";
-import { CONCEPTOS_COBRO, type Presupuesto } from "@/lib/datos/tipos";
+import { CONCEPTOS_COBRO, type Contacto, type Presupuesto } from "@/lib/datos/tipos";
 import { formatoEuros, hoyMadrid, leerEuros } from "@/lib/formato";
 import type { PrecisionFecha } from "@/lib/negocio";
 import { cn } from "@/lib/utils";
@@ -296,18 +296,21 @@ export function DialogoDatos({ abierto, cerrar, presupuesto }: Abierto & { presu
   );
 }
 
-export function DialogoContacto({ abierto, cerrar, clienteId }: Abierto & { clienteId: string }) {
+export function DialogoContacto({ abierto, cerrar, clienteId, contacto }: Abierto & { clienteId: string; contacto?: Contacto }) {
   const listas = useListas();
-  const [c, setC] = useState({ nombre: "", rol: "", telefono: "", email: "" });
+  const [c, setC] = useState({
+    nombre: contacto?.nombre ?? "", rol: contacto?.rol ?? "", telefono: contacto?.telefono ?? "", email: contacto?.email ?? "",
+  });
 
   async function guardar(e: FormEvent) {
     e.preventDefault();
-    const { error } = await crearClienteNavegador().from("contactos").insert({
-      cliente_id: clienteId, nombre: c.nombre.trim(), rol: c.rol || null,
-      telefono: c.telefono.trim() || null, email: c.email.trim() || null,
-    });
+    const datos = { nombre: c.nombre.trim(), rol: c.rol || null, telefono: c.telefono.trim() || null, email: c.email.trim() || null };
+    const sb = crearClienteNavegador();
+    const { error } = contacto
+      ? await sb.from("contactos").update(datos).eq("id", contacto.id)
+      : await sb.from("contactos").insert({ ...datos, cliente_id: clienteId });
     if (error) return toast.error(error.message);
-    toast.success("Contacto añadido ✓");
+    toast.success(contacto ? "Contacto guardado ✓" : "Contacto añadido ✓");
     setC({ nombre: "", rol: "", telefono: "", email: "" });
     cerrar();
   }
@@ -315,7 +318,7 @@ export function DialogoContacto({ abierto, cerrar, clienteId }: Abierto & { clie
   return (
     <Dialog open={abierto} onOpenChange={(a) => !a && cerrar()}>
       <DialogContent>
-        <DialogHeader><DialogTitle>Nuevo contacto</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{contacto ? "Editar contacto" : "Nuevo contacto"}</DialogTitle></DialogHeader>
         <form id="form-contacto" onSubmit={guardar} className="grid gap-4 sm:grid-cols-2">
           <Campo id="c-nombre" etiqueta="Nombre"><Input id="c-nombre" required autoFocus value={c.nombre} onChange={(e) => setC({ ...c, nombre: e.target.value })} /></Campo>
           <Campo id="c-rol" etiqueta="Rol">

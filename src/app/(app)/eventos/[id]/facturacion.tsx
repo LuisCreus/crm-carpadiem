@@ -10,6 +10,7 @@ import { useTablaEnVivo } from "@/hooks/use-tabla-en-vivo";
 import { SELECT_FACTURA, aFactura, type Evento, type Factura } from "@/lib/datos/tipos";
 import { conceptoMensualidad, resumenFacturacion } from "@/lib/facturacion";
 import { formatoEuros, hoyMadrid } from "@/lib/formato";
+import { cuotaDelMes, nombreMes } from "@/lib/cuotas";
 
 // Tarjeta "Facturación" de la ficha del evento: qué se ha facturado y qué falta
 export function TarjetaFacturacion({ e, cobrado }: { e: Evento; cobrado: number }) {
@@ -56,7 +57,10 @@ export function TarjetaFacturacion({ e, cobrado }: { e: Evento; cobrado: number 
       )}
       {e.es_larga_duracion && (
         <p className="mb-3 text-sm text-muted-foreground">
-          Proyecto de larga duración · cuota mensual {e.cuota_mensual ? formatoEuros(Number(e.cuota_mensual)) : "sin definir (ponla en Editar)"}
+          Carpa de temporada · {e.cuotas?.length
+            ? e.cuotas.map((c) => `${formatoEuros(Number(c.importe))}/mes desde ${nombreMes(c.desde)}`).join(" · ")
+            : e.cuota_mensual ? `${formatoEuros(Number(e.cuota_mensual))}/mes` : "cuota sin definir (ponla en Editar)"}
+          {" "}· la mensualidad se factura a final de mes
         </p>
       )}
 
@@ -87,7 +91,7 @@ export function TarjetaFacturacion({ e, cobrado }: { e: Evento; cobrado: number 
       {(dialogo === "nueva" || dialogo === "mensualidad") && (
         <DialogoFactura cerrar={() => setDialogo(null)} eventoId={e.id} clienteId={e.cliente_id}
           inicial={dialogo === "mensualidad"
-            ? { tipo: "mensualidad", concepto: conceptoMensualidad(hoy), importe: e.cuota_mensual !== null ? Number(e.cuota_mensual) : null }
+            ? { tipo: "mensualidad", concepto: conceptoMensualidad(hoy), importe: cuotaDelMes(e.cuotas ?? [], hoy.slice(0, 7), e.cuota_mensual !== null ? Number(e.cuota_mensual) : null) }
             : undefined} />
       )}
       {dialogo !== null && typeof dialogo === "object" && (

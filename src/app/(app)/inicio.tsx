@@ -42,12 +42,13 @@ export function Inicio() {
     async (sb) => {
       const [pr, ev, co, le, aj, fa, ga] = await Promise.all([
         sb.from("presupuestos").select("id, codigo, anio, estado, enviado_at, importe, reserva_pct, cliente_id, cliente:clientes(nombre)").is("deleted_at", null),
-        sb.from("eventos").select("id, presupuesto_id, cliente_id, estado, modalidad, fecha_precision, fecha_inicio, fecha_fin, montaje_inicio, desmontaje_inicio, importe, ubicacion, provincia, material, tipo_evento, es_larga_duracion, cuota_mensual, cliente:clientes(nombre)")
+        sb.from("eventos").select("id, presupuesto_id, cliente_id, estado, modalidad, fecha_precision, fecha_inicio, fecha_fin, montaje_inicio, desmontaje_inicio, importe, ubicacion, provincia, material, tipo_evento, es_larga_duracion, cuota_mensual, cuotas, cliente:clientes(nombre)")
           .is("deleted_at", null),
         sb.from("cobros").select("presupuesto_id, importe").is("deleted_at", null),
         sb.from("leads").select("id, cliente_nombre, estado, proxima_accion_fecha, proxima_accion_texto").is("deleted_at", null),
         sb.from("ajustes").select("dias_seguimiento, dias_limite_seguro, dias_aviso_seguro, dias_aviso_resto, dias_aviso_cobro_factura, dias_aviso_pago").maybeSingle(),
-        sb.from("facturas").select("id, evento_id, tipo, estado, importe, codigo, fecha_emision, correo_preparado_at").is("deleted_at", null).neq("estado", "pagada"),
+        // Las pagadas solo hacen falta para contar las mensualidades ya facturadas
+        sb.from("facturas").select("id, evento_id, tipo, estado, importe, codigo, fecha_emision, correo_preparado_at").is("deleted_at", null).or("estado.neq.pagada,tipo.eq.mensualidad"),
         sb.from("facturas_recibidas").select("id, total, vencimiento, estado, proveedor:proveedores(nombre)").is("deleted_at", null).eq("estado", "pendiente"),
       ]);
       const cobrado = new Map<string, number>();

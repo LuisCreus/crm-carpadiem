@@ -107,6 +107,7 @@ export type Evento = {
   hoja_montaje_url: string | null;
   hoja_montaje_item_id: string | null;
   cuota_mensual: number | null;
+  cuotas: { desde: string; importe: number }[];
 } & DatosFacturacion & {
   cliente: ({ id: string; nombre: string } & DatosFacturacion) | null;
   presupuesto: { id: string; codigo: string; estado: EstadoPresupuesto; reserva_pct: number | null; comision_pct: number | null } | null;
