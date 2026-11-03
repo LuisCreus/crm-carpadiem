@@ -6,7 +6,8 @@
 import { useMemo, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Paperclip } from "lucide-react";
+import { Paperclip, X } from "lucide-react";
+import { Autocompletar } from "@/components/autocompletar";
 import { Campo, claseSelect } from "@/components/campo";
 import { Etiqueta } from "@/components/etiqueta-estado";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ import { moverAPapelera } from "@/lib/datos/papelera";
 import { uno, type FacturaRecibida, type Proveedor } from "@/lib/datos/tipos";
 import { formatoEuros, formatoFecha, hoyMadrid, leerEuros } from "@/lib/formato";
 import { totalRecibida } from "@/lib/gastos";
+import { formatoIban, type DatosLeidos } from "@/lib/leer-factura";
 
 type EventoOpcion = { id: string; texto: string };
 
@@ -74,6 +76,13 @@ export function DialogoGasto({ cerrar, gasto, eventoId }: { cerrar: () => void; 
     comentarios: gasto?.comentarios ?? "",
   });
   const set = (k: keyof typeof c, v: string) => setC((x) => ({ ...x, [k]: v }));
+  const [eventoTexto, setEventoTexto] = useState("");
+  const [leyendo, setLeyendo] = useState(false);
+  // El concepto es lo que verá el proveedor en su banco: por defecto "Pago factura {nº}"
+  const conceptoAuto = (numero: string) => (numero.trim() ? `Pago factura ${numero.trim()}` : "");
+  function cambiarNumero(numero: string) {
+    setC((x) => ({ ...x, numero, concepto: !x.concepto || x.concepto === conceptoAuto(x.numero) ? conceptoAuto(numero) : x.concepto }));
+  }
 
   const existente = proveedores.find((p) => p.nombre.trim().toLowerCase() === c.proveedor.trim().toLowerCase());
   const tipo = c.evento ? "variable" : "fijo";
@@ -81,13 +90,46 @@ export function DialogoGasto({ cerrar, gasto, eventoId }: { cerrar: () => void; 
   const base = leerEuros(c.base);
   const total = base !== null ? totalRecibida(base, Number(c.iva) || 0, Number(c.irpf) || 0) : null;
 
-  // Al elegir un proveedor conocido se rellenan su NIF, su IBAN y su categoría habitual
-  function elegirProveedor(nombre: string) {
-    const p = proveedores.find((x) => x.nombre.trim().toLowerCase() === nombre.trim().toLowerCase());
-    setC((x) => ({
-      ...x, proveedor: nombre,
-      ...(p ? { nif: x.nif || p.nif || "", iban: x.iban || p.iban || "", categoria: x.categoria || p.categoria || "" } : {}),
-    }));
+  // Al elegir un proveedor guardado se rellenan su NIF, su IBAN y su categoría habitual
+  function elegirProveedor(p: Proveedor) {
+    setC((x) => ({ ...x, proveedor: p.nombre, nif: p.nif ?? x.nif, iban: p.iban ?? x.iban, categoria: x.categoria || p.categoria || "" }));
+  }
+
+  // Al adjuntar un PDF se leen sus datos y se rellenan los campos vacíos
+  async function adjuntar(nuevo: File | null) {
+    setArchivo(nuevo);
+    if (!nuevo) return;
+    if (!/\.pdf$/i.test(nuevo.name)) return toast.info("De las fotos no se pueden leer los datos: rellénalos a mano.");
+    setLeyendo(true);
+    try {
+      const datos = new FormData();
+      datos.append("archivo", nuevo);
+      const r = await fetch("/api/gastos/leer", { method: "POST", body: datos });
+      const j = (await r.json()) as { sinTexto?: boolean; datos?: DatosLeidos; proveedor?: Proveedor | null };
+      if (!r.ok || j.sinTexto || !j.datos) return toast.info("Este PDF es un escaneo: no se pueden leer los datos, rellénalos a mano.");
+      const d = j.datos;
+      const p = j.proveedor;
+      setC((x) => ({
+        ...x,
+        proveedor: x.proveedor || p?.nombre || "",
+        nif: x.nif || d.nif || p?.nif || "",
+        iban: x.iban || d.iban || p?.iban || "",
+        numero: x.numero || d.numero || "",
+        concepto: x.concepto || conceptoAuto(x.numero || d.numero || ""),
+        fecha: d.fecha ?? x.fecha,
+        categoria: x.categoria || p?.categoria || "",
+        base: x.base || (d.base !== null ? String(d.base).replace(".", ",") : d.total !== null && d.ivaPct !== null
+          ? String(Math.round(d.total / (1 + d.ivaPct / 100 - (d.irpfPct ?? 0) / 100) * 100) / 100).replace(".", ",") : ""),
+        iva: d.ivaPct !== null ? String(d.ivaPct) : x.iva,
+        irpf: d.irpfPct !== null ? String(d.irpfPct) : x.irpf,
+      }));
+      const leidos = [d.nif && "NIF", d.iban && "IBAN", d.numero && "nº", d.fecha && "fecha", (d.base ?? d.total) !== null && "importes"].filter(Boolean);
+      toast.success(`${p ? `Proveedor reconocido: ${p.nombre}. ` : ""}He leído ${leidos.length ? leidos.join(", ") : "poco"}: revísalo antes de guardar.`, { duration: 8000 });
+    } catch {
+      toast.info("No he podido leer el PDF: rellena los datos a mano.");
+    } finally {
+      setLeyendo(false);
+    }
   }
 
   async function guardar(e: FormEvent) {
@@ -109,7 +151,7 @@ export function DialogoGasto({ cerrar, gasto, eventoId }: { cerrar: () => void; 
         subido = j;
       }
       // Proveedor: el que ya existe (actualizando NIF/IBAN si se han escrito) o uno nuevo
-      const datosProveedor = { nif: c.nif.trim() || null, iban: c.iban.trim() || null };
+      const datosProveedor = { nif: c.nif.replace(/\s/g, "").toUpperCase() || null, iban: c.iban.trim() ? formatoIban(c.iban) : null };
       let proveedorId = existente?.id;
       if (existente) {
         const cambios = Object.fromEntries(Object.entries(datosProveedor).filter(([k, v]) => v && v !== existente[k as keyof Proveedor]));
@@ -134,7 +176,7 @@ export function DialogoGasto({ cerrar, gasto, eventoId }: { cerrar: () => void; 
         base,
         iva_pct: Number(c.iva) || 0,
         irpf_pct: Number(c.irpf) || 0,
-        iban: c.iban.trim() || null,
+        iban: datosProveedor.iban,
         comentarios: c.comentarios.trim() || null,
         ...(subido ? { archivo_item_id: subido.id, archivo_url: subido.url, archivo_nombre: subido.nombre } : {}),
       };
@@ -156,24 +198,47 @@ export function DialogoGasto({ cerrar, gasto, eventoId }: { cerrar: () => void; 
       <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{gasto ? "Editar factura recibida" : "Factura recibida"}</DialogTitle>
-          <DialogDescription>Un gasto de un proveedor. El PDF o la foto se guarda en 03. FINANCIERO/01. FACTURAS/01. PENDIENTE SARA/02. RECIBIDAS.</DialogDescription>
+          <DialogDescription>Adjunta primero el PDF: se leen solos el NIF, el IBAN, el número, la fecha y los importes. Se guarda en 03. FINANCIERO/01. FACTURAS/01. PENDIENTE SARA/02. RECIBIDAS.</DialogDescription>
         </DialogHeader>
         <form id="form-gasto" onSubmit={guardar} className="grid gap-4 sm:grid-cols-2">
+          <Campo id="g-archivo" etiqueta="Factura (PDF o foto)" className="sm:col-span-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" variant="outline" size="sm" disabled={leyendo} onClick={() => archivoRef.current?.click()}>
+                <Paperclip className="size-4" aria-hidden /> {leyendo ? "Leyendo el PDF…" : archivo ? "Cambiar archivo" : gasto?.archivo_nombre ? "Sustituir archivo" : "Adjuntar archivo"}
+              </Button>
+              <span className="min-w-0 truncate text-sm text-muted-foreground">{archivo?.name ?? gasto?.archivo_nombre ?? "Si es un PDF, se rellenan solos los datos"}</span>
+              <input ref={archivoRef} id="g-archivo" type="file" accept="application/pdf,image/*" className="hidden"
+                onChange={(e) => void adjuntar(e.target.files?.[0] ?? null)} />
+            </div>
+          </Campo>
           <Campo id="g-proveedor" etiqueta="Proveedor" className="sm:col-span-2">
-            <Input id="g-proveedor" list="g-proveedores" required autoFocus value={c.proveedor} onChange={(e) => elegirProveedor(e.target.value)}
-              placeholder="Escribe o elige uno de la lista" />
-            <datalist id="g-proveedores">{proveedores.map((p) => <option key={p.id} value={p.nombre} />)}</datalist>
-            {c.proveedor.trim() && !existente && <span className="text-xs text-muted-foreground">Proveedor nuevo: se guarda para la próxima vez.</span>}
+            <Autocompletar id="g-proveedor" required autoFocus valor={c.proveedor} placeholder="Escribe el nombre: David…"
+              onTexto={(t) => set("proveedor", t)}
+              onElegir={(s) => { const p = proveedores.find((x) => x.id === s.id); if (p) elegirProveedor(p); }}
+              sugerencias={proveedores.map((p) => ({ id: p.id, texto: p.nombre, detalle: [p.nif, p.iban].filter(Boolean).join(" · ") || undefined }))} />
+            {c.proveedor.trim() && !existente && <span className="text-xs text-muted-foreground">Proveedor nuevo: se guarda en Proveedores para la próxima vez.</span>}
           </Campo>
           <Campo id="g-nif" etiqueta="NIF del proveedor"><Input id="g-nif" value={c.nif} onChange={(e) => set("nif", e.target.value)} /></Campo>
           <Campo id="g-iban" etiqueta="IBAN (para pagarle)"><Input id="g-iban" value={c.iban} onChange={(e) => set("iban", e.target.value)} placeholder="ES00 0000 0000 0000 0000 0000" /></Campo>
-          <Campo id="g-numero" etiqueta="Nº de factura"><Input id="g-numero" value={c.numero} onChange={(e) => set("numero", e.target.value)} placeholder="Vacío si es un tique" /></Campo>
+          <Campo id="g-numero" etiqueta="Nº de factura"><Input id="g-numero" value={c.numero} onChange={(e) => cambiarNumero(e.target.value)} placeholder="Vacío si es un tique" /></Campo>
           <Campo id="g-fecha" etiqueta="Fecha de la factura"><Input id="g-fecha" type="date" required value={c.fecha} onChange={(e) => set("fecha", e.target.value)} /></Campo>
           <Campo id="g-evento" etiqueta="¿De qué evento es?" className="sm:col-span-2">
-            <select id="g-evento" className={claseSelect} value={c.evento} onChange={(e) => setC((x) => ({ ...x, evento: e.target.value, categoria: "" }))}>
-              <option value="">Gasto general (no es de un evento)</option>
-              {eventos.map((e) => <option key={e.id} value={e.id}>{e.texto}</option>)}
-            </select>
+            {c.evento ? (
+              <div className="flex items-center gap-2 rounded-lg border bg-background px-2.5 py-1.5 text-sm">
+                <span className="flex-1">{eventos.find((e) => e.id === c.evento)?.texto ?? "Evento"}</span>
+                <Button type="button" size="icon-sm" variant="ghost" aria-label="Quitar el evento" onClick={() => setC((x) => ({ ...x, evento: "", categoria: "" }))}>
+                  <X className="size-3.5" aria-hidden />
+                </Button>
+              </div>
+            ) : (
+              <>
+                <Autocompletar id="g-evento" valor={eventoTexto} placeholder="Escribe el cliente o la fecha… (vacío = gasto general)"
+                  onTexto={setEventoTexto}
+                  onElegir={(s) => { setC((x) => ({ ...x, evento: s.id, categoria: "" })); setEventoTexto(""); }}
+                  sugerencias={eventos.map((e) => ({ id: e.id, texto: e.texto }))} />
+                <span className="text-xs text-muted-foreground">Si no eliges ninguno, es un gasto general (gestoría, web, seguro…).</span>
+              </>
+            )}
           </Campo>
           <Campo id="g-categoria" etiqueta="Categoría">
             <select id="g-categoria" className={claseSelect} value={c.categoria} onChange={(e) => set("categoria", e.target.value)}>
@@ -182,7 +247,9 @@ export function DialogoGasto({ cerrar, gasto, eventoId }: { cerrar: () => void; 
             </select>
           </Campo>
           <Campo id="g-vencimiento" etiqueta="Vencimiento (opcional)"><Input id="g-vencimiento" type="date" value={c.vencimiento} onChange={(e) => set("vencimiento", e.target.value)} /></Campo>
-          <Campo id="g-concepto" etiqueta="Concepto" className="sm:col-span-2"><Input id="g-concepto" value={c.concepto} onChange={(e) => set("concepto", e.target.value)} placeholder="Montaje y desmontaje, furgoneta L2H2…" /></Campo>
+          <Campo id="g-concepto" etiqueta="Concepto de la transferencia (lo verá el proveedor en su banco)" className="sm:col-span-2">
+            <Input id="g-concepto" maxLength={140} value={c.concepto} onChange={(e) => set("concepto", e.target.value)} placeholder="Pago factura 21" />
+          </Campo>
           <Campo id="g-base" etiqueta="Base sin IVA (€)"><Input id="g-base" inputMode="decimal" required value={c.base} onChange={(e) => set("base", e.target.value)} /></Campo>
           <div className="grid grid-cols-2 gap-3">
             <Campo id="g-iva" etiqueta="IVA %"><Input id="g-iva" type="number" min={0} max={100} value={c.iva} onChange={(e) => set("iva", e.target.value)} /></Campo>
@@ -192,16 +259,6 @@ export function DialogoGasto({ cerrar, gasto, eventoId }: { cerrar: () => void; 
             Total a pagar: <b>{formatoEuros(total)}</b>
             <span className="text-muted-foreground"> · el IRPF es la retención que llevan algunas facturas de autónomos</span>
           </div>
-          <Campo id="g-archivo" etiqueta="Factura (PDF o foto)" className="sm:col-span-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => archivoRef.current?.click()}>
-                <Paperclip className="size-4" aria-hidden /> {archivo ? "Cambiar archivo" : gasto?.archivo_nombre ? "Sustituir archivo" : "Adjuntar archivo"}
-              </Button>
-              <span className="min-w-0 truncate text-sm text-muted-foreground">{archivo?.name ?? gasto?.archivo_nombre ?? "Sin archivo"}</span>
-              <input ref={archivoRef} id="g-archivo" type="file" accept="application/pdf,image/*" className="hidden"
-                onChange={(e) => setArchivo(e.target.files?.[0] ?? null)} />
-            </div>
-          </Campo>
           <Campo id="g-comentarios" etiqueta="Comentarios" className="sm:col-span-2">
             <Textarea id="g-comentarios" rows={2} value={c.comentarios} onChange={(e) => set("comentarios", e.target.value)} />
           </Campo>

@@ -1,5 +1,5 @@
 import {
-  Boxes, CalendarDays, FileText, Home, Receipt, Settings, Tent, Trash2, UserRound, Users, type LucideIcon,
+  Boxes, CalendarDays, FileText, Home, Receipt, Settings, Tent, Trash2, Truck, UserRound, Users, type LucideIcon,
 } from "lucide-react";
 
 export type ItemNav = { href: string; titulo: string; icono: LucideIcon; soloAdmin?: boolean };
@@ -12,6 +12,7 @@ export const NAV_PRINCIPAL: ItemNav[] = [
   { href: "/planificacion", titulo: "Planificación", icono: CalendarDays },
   { href: "/facturas", titulo: "Facturas", icono: Receipt },
   { href: "/intermediarios", titulo: "Intermediarios", icono: Users },
+  { href: "/proveedores", titulo: "Proveedores", icono: Truck },
   { href: "/inventario", titulo: "Inventario", icono: Boxes },
 ];
 
