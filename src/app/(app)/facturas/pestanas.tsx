@@ -1,13 +1,20 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-// Emitidas (a clientes) · Recibidas (de proveedores)
-export function PestanasFacturas({ activa }: { activa: "emitidas" | "recibidas" }) {
+const PESTANAS = [
+  ["emitidas", "/facturas", "Emitidas"],
+  ["recibidas", "/facturas/recibidas", "Recibidas (gastos)"],
+  ["rentabilidad", "/facturas/rentabilidad", "Rentabilidad"],
+  ["gestoria", "/facturas/gestoria", "Gestoría"],
+] as const;
+
+// Emitidas (a clientes) · Recibidas (de proveedores) · Rentabilidad · Gestoría (por trimestre)
+export function PestanasFacturas({ activa }: { activa: (typeof PESTANAS)[number][0] }) {
   return (
-    <nav aria-label="Tipo de facturas" className="mb-5 inline-flex overflow-hidden rounded-lg border text-sm">
-      {([["emitidas", "/facturas", "Emitidas"], ["recibidas", "/facturas/recibidas", "Recibidas (gastos)"]] as const).map(([clave, href, texto]) => (
+    <nav aria-label="Facturas" className="mb-5 inline-flex max-w-full overflow-x-auto rounded-lg border text-sm">
+      {PESTANAS.map(([clave, href, texto]) => (
         <Link key={clave} href={href} aria-current={activa === clave ? "page" : undefined}
-          className={cn("px-3 py-1.5 no-underline", activa === clave ? "bg-foreground text-background" : "bg-card text-foreground")}>
+          className={cn("px-3 py-1.5 whitespace-nowrap no-underline", activa === clave ? "bg-foreground text-background" : "bg-card text-foreground")}>
           {texto}
         </Link>
       ))}

@@ -109,11 +109,11 @@ export type Evento = {
   cuota_mensual: number | null;
 } & DatosFacturacion & {
   cliente: ({ id: string; nombre: string } & DatosFacturacion) | null;
-  presupuesto: { id: string; codigo: string; estado: EstadoPresupuesto; reserva_pct: number | null } | null;
+  presupuesto: { id: string; codigo: string; estado: EstadoPresupuesto; reserva_pct: number | null; comision_pct: number | null } | null;
 };
 
 export const SELECT_EVENTO =
-  "*, cliente:clientes(id, nombre, fact_nombre, fact_nif, fact_domicilio, fact_cp_ciudad, fact_email), presupuesto:presupuestos(id, codigo, estado, reserva_pct)";
+  "*, cliente:clientes(id, nombre, fact_nombre, fact_nif, fact_domicilio, fact_cp_ciudad, fact_email), presupuesto:presupuestos(id, codigo, estado, reserva_pct, comision_pct)";
 
 // Datos de facturación (en el cliente, en el evento si se factura a otro, y congelados en cada factura)
 export type DatosFacturacion = {

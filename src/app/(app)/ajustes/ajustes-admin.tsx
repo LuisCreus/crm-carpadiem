@@ -14,7 +14,7 @@ import { codigoPresupuesto } from "@/lib/formato";
 import { exportarAhora } from "@/lib/acciones-copias";
 
 type Perfil = { id: string; email: string; nombre: string | null; rol: "admin" | "usuario"; activo: boolean };
-type Ajustes = { dominios_permitidos: string[]; dias_aviso_resto: number; dias_aviso_cobro_factura: number };
+type Ajustes = { dominios_permitidos: string[]; dias_aviso_resto: number; dias_aviso_cobro_factura: number; email_gestoria: string | null };
 type NumeracionFacturas = { anio: number; ultimo_numero: number };
 type Numeracion = { anio: number; numero_inicial: number; ultimo_numero: number };
 
@@ -45,7 +45,7 @@ export function AjustesAdmin({ miId }: { miId: string }) {
   });
 
   const ajustes = useTablaEnVivo<Ajustes>(["ajustes"], async (sb) => {
-    const { data, error } = await sb.from("ajustes").select("dominios_permitidos, dias_aviso_resto, dias_aviso_cobro_factura");
+    const { data, error } = await sb.from("ajustes").select("dominios_permitidos, dias_aviso_resto, dias_aviso_cobro_factura, email_gestoria");
     if (error) throw new Error(error.message);
     return data as Ajustes[];
   });
@@ -234,6 +234,14 @@ export function AjustesAdmin({ miId }: { miId: string }) {
               <Input type="number" min={0} className="w-20" defaultValue={ajustes.datos[0].dias_aviso_cobro_factura}
                 onBlur={(e) => ajusteDias("dias_aviso_cobro_factura", e.target.value)} />
               días
+            </label>
+            <label className="flex flex-wrap items-center gap-2 sm:col-span-2">
+              Email de la gestoría (opcional)
+              <Input type="email" className="w-72" placeholder="Si está vacío, lo escribes en Outlook" defaultValue={ajustes.datos[0].email_gestoria ?? ""}
+                onBlur={(e) => {
+                  const email = e.target.value.trim() || null;
+                  if (email !== ajustes.datos[0]?.email_gestoria) void guardar(supabase.from("ajustes").update({ email_gestoria: email }).eq("id", true));
+                }} />
             </label>
           </div>
         )}
