@@ -75,17 +75,6 @@ export function PantallaPyg({ esAdmin }: { esAdmin: boolean }) {
     if (error) toast.error(error.message);
   }
 
-  async function rellenarDirector() {
-    if (!p) return;
-    const ultimo = p.director.meses.reduce((u, x, i) => (x ? i : u), -1);
-    if (ultimo < 0 || ultimo === 11) return toast.info("Escribe primero el sueldo de un mes");
-    if (!window.confirm(`¿Poner ${formatoEuros(p.director.meses[ultimo])} de sueldo de ${MESES[ultimo + 1]} a Dic?`)) return;
-    const sb = crearClienteNavegador();
-    const filas = MESES.slice(ultimo + 1).map((_, j) => ({ mes: `${anio}-${String(ultimo + 2 + j).padStart(2, "0")}-01`, concepto: "director", importe: p.director.meses[ultimo] }));
-    const { error } = await sb.from("pyg_manual").upsert(filas, { onConflict: "mes,concepto" });
-    if (error) toast.error(error.message); else toast.success("Guardado ✓");
-  }
-
   // Funciones (no componentes) para que las celdas en edición no se reinicien al recargar
   const linea = ({ f, nivel = 0, fuerte, desplegable, editable, base }: {
     f: Fila; nivel?: 0 | 1; fuerte?: boolean; desplegable?: boolean; editable?: Manual["concepto"]; base?: Fila;
@@ -97,9 +86,6 @@ export function PantallaPyg({ esAdmin }: { esAdmin: boolean }) {
             <ChevronDown className={cn("size-3.5 transition-transform", !abiertos.has(f.clave) && "-rotate-90")} aria-hidden />{f.nombre}
           </button>
         ) : f.nombre}
-        {editable === "director" && esAdmin && (
-          <button type="button" onClick={() => void rellenarDirector()} className="ml-2 text-xs font-normal text-primary">rellenar hasta dic.</button>
-        )}
         {base && <span className="ml-2 text-xs font-normal text-muted-foreground">{pct(f.total, base.total)}</span>}
       </th>
       {f.meses.map((x, i) => (
@@ -155,7 +141,7 @@ export function PantallaPyg({ esAdmin }: { esAdmin: boolean }) {
                 {linea({ f: p.margenBruto, fuerte: true, base: p.ingresos })}
                 {grupo(p.fijos, p.porFijo)}
                 {linea({ f: p.personal, fuerte: true })}
-                {linea({ f: p.director, nivel: 1, editable: "director" })}
+                {linea({ f: p.director, nivel: 1 })}
                 {linea({ f: p.bonus, nivel: 1, editable: "bonus" })}
                 {linea({ f: p.ebitda, fuerte: true, base: p.ingresos })}
                 {linea({ f: p.amortizacion })}
@@ -170,7 +156,7 @@ export function PantallaPyg({ esAdmin }: { esAdmin: boolean }) {
           <p className="mt-2 text-xs text-muted-foreground">
             Ingresos y costes de cada evento en el mes del evento; gastos generales en el mes de su factura. El impuesto se calcula sobre lo acumulado
             en el año (un mes con pérdidas compensa los siguientes).{p.sinFecha > 0 && ` ${p.sinFecha} ${p.sinFecha === 1 ? "evento sin fecha cerrada no entra" : "eventos sin fecha cerrada no entran"}.`}
-            {esAdmin && " Sueldo, bonus e intereses: pulsa en la celda para escribirlos."}
+            {" El sueldo del director sale de las facturas de Maketa."}{esAdmin && " Bonus e intereses: pulsa en la celda para escribirlos."}
           </p>
 
           <section className="mt-8">

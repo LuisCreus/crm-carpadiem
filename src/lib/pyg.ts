@@ -3,13 +3,15 @@
 //     duración, cada factura en su mes), desglosados por tipo de evento.
 //   · Costes variables: gastos de cada evento (en el mes del evento) + comisión prevista.
 //   · Costes fijos: gastos generales en el mes de su factura. El material de carpas no: es CAPEX.
-//   · Personal e intereses: a mano. Amortización: cada activo desde su mes de compra.
+//   · Personal: el sueldo del director son las facturas de su categoría (Maketa); el bonus, a mano.
+//   · Intereses: a mano. Amortización: cada activo desde su mes de compra.
 //   · IS: 15 % hasta 2027 y 25 % desde 2028, sobre el beneficio acumulado del año.
 
 import { rentabilidadEvento, type EventoRentabilidad, type FacturaRentabilidad } from "@/lib/rentabilidad";
 
 const redondear = (n: number) => Math.round(n * 100) / 100;
 export const CATEGORIA_CAPEX = "material_carpas";
+export const CATEGORIA_DIRECTOR = "director";
 
 export type EventoPyg = EventoRentabilidad & { tipo_evento: string | null };
 export type GastoPyg = { evento_id: string | null; base: number; fecha: string; categoria: string | null };
@@ -55,6 +57,7 @@ export function calcularPyg(anio: number, eventos: EventoPyg[], gastos: GastoPyg
     g.get(clave)![i] += importe;
   };
   const ingresos = grupos(), variables = grupos(), fijos = grupos();
+  const sueldo = ceros();
   const nombreCategoria = (c: string | null) => (c ? nombres.categorias.get(c)?.nombre ?? c : "Sin categoría");
   let sinFecha = 0;
 
@@ -80,6 +83,7 @@ export function calcularPyg(anio: number, eventos: EventoPyg[], gastos: GastoPyg
     // El gasto de un evento va al mes del evento (salvo larga duración o evento sin fecha: al de la factura)
     const fecha = e && !e.es_larga_duracion && e.fecha_precision !== "por_definir" && e.fecha_inicio ? e.fecha_inicio : g.fecha;
     if (!delAnio(fecha)) continue;
+    if (g.categoria === CATEGORIA_DIRECTOR) { sueldo[indice(fecha)] += g.base; continue; }
     const esVariable = g.evento_id ? true : nombres.categorias.get(g.categoria ?? "")?.tipo === "variable";
     sumar(esVariable ? variables : fijos, g.categoria ?? "sin", indice(fecha), g.base);
   }
@@ -100,7 +104,7 @@ export function calcularPyg(anio: number, eventos: EventoPyg[], gastos: GastoPyg
   const tVariables = total("variables", "Costes variables", porVariable);
   const margenBruto = restar("margen", "Margen bruto", tIngresos, tVariables);
   const tFijos = total("fijos", "Costes fijos", porFijo);
-  const director = fila("director", "Director", aMano("director"));
+  const director = fila("director", "Director", sueldo.map((x, i) => x + aMano("director")[i]));
   const bonus = fila("bonus", "Bonus director", aMano("bonus"));
   const personal = total("personal", "Costes de personal", [director, bonus]);
   const ebitda = restar("ebitda", "EBITDA", margenBruto, tFijos, personal);

@@ -5,7 +5,7 @@ const nombres: Nombres = {
   tiposEvento: new Map([["boda", "Boda"], ["larga_duracion", "Proyecto de larga duración"]]),
   categorias: new Map([
     ["montadores", { nombre: "Montadores", tipo: "variable" }], ["gestoria", { nombre: "Gestoría", tipo: "fijo" }],
-    ["ia", { nombre: "IA", tipo: "fijo" }], ["material_carpas", { nombre: "Material de carpas (inversión)", tipo: "fijo" }],
+    ["ia", { nombre: "IA", tipo: "fijo" }], ["director", { nombre: "Sueldo del director", tipo: "fijo" }], ["material_carpas", { nombre: "Material de carpas (inversión)", tipo: "fijo" }],
   ]),
 };
 const evento = (x: Partial<EventoPyg>): EventoPyg => ({
@@ -40,17 +40,19 @@ describe("P&L", () => {
       { evento_id: "boda", base: 1300, fecha: "2026-09-02", categoria: "montadores" },
       { evento_id: null, base: 250, fecha: "2026-08-28", categoria: "gestoria" },
       { evento_id: null, base: 350, fecha: "2026-10-06", categoria: "material_carpas" },
+      { evento_id: null, base: 1100, fecha: "2026-08-31", categoria: "director" },
     ];
     const facturas = [
       { evento_id: "pena", importe: 670, estado: "pagada", fecha_emision: "2026-08-31" },
       { evento_id: "pena", importe: 670, estado: "prevista", fecha_emision: null },
     ];
-    const p = calcularPyg(2026, eventos, gastos, facturas, [], [{ mes: "2026-08-01", concepto: "director", importe: 1100 }], nombres);
+    const p = calcularPyg(2026, eventos, gastos, facturas, [], [], nombres);
     const ago = 7;
     expect(p.porTipo.map((f) => [f.nombre, f.meses[ago]])).toEqual([["Boda", 6000], ["Proyecto de larga duración", 670]]);
     expect(p.ingresos.meses[ago]).toBe(6670);
     expect(p.porVariable.map((f) => [f.clave, f.meses[ago]])).toEqual([["montadores", 1300], ["comisiones", 600]]);
-    expect(p.fijos.meses[ago]).toBe(250);
+    expect(p.fijos.meses[ago]).toBe(250); // la factura del director va a personal, no a fijos
+    expect(p.director.meses[ago]).toBe(1100);
     expect(p.fijos.meses[9]).toBe(0);
     expect(p.ebitda.meses[ago]).toBe(6670 - 1900 - 250 - 1100);
     expect(p.sinFecha).toBe(1);
