@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { Mail, Phone } from "lucide-react";
 import { Etiqueta, CLASE_CONFIRMADO, CLASE_SEGURO } from "@/components/etiqueta-estado";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { nombreDe, useListas } from "@/hooks/use-listas";
 import { uno } from "@/lib/datos/tipos";
 import { formatoEuros, formatoFecha, hoyMadrid } from "@/lib/formato";
 import { MESES, type EstadoPresupuesto, type PrecisionFecha } from "@/lib/negocio";
+import { crearClienteNavegador } from "@/lib/supabase/client";
 import { calcularAvisos, numerosPeriodo, reservas, type Aviso, type TipoAviso } from "@/lib/operativa";
 import { cn } from "@/lib/utils";
 
@@ -37,11 +39,18 @@ export function Inicio() {
   const hoy = hoyMadrid();
   const [periodo, setPeriodo] = useState<"mes" | "anio">("mes");
 
+  // El recordatorio vuelve a salir dentro de una semana si el presupuesto sigue igual
+  async function seguimientoHecho(id: string) {
+    const { error } = await crearClienteNavegador().from("presupuestos").update({ seguimiento_desde: new Date().toISOString() }).eq("id", id);
+    if (error) toast.error(error.message);
+    else toast.success("Anotado ✓ · Te lo recuerdo en una semana si no cambia");
+  }
+
   const { datos, cargando } = useTablaEnVivo<Datos>(
     ["presupuestos", "eventos", "cobros", "leads", "clientes", "ajustes", "facturas", "facturas_recibidas"],
     async (sb) => {
       const [pr, ev, co, le, aj, fa, ga] = await Promise.all([
-        sb.from("presupuestos").select("id, codigo, anio, estado, enviado_at, importe, reserva_pct, cliente_id, cliente:clientes(nombre)").is("deleted_at", null),
+        sb.from("presupuestos").select("id, codigo, anio, estado, enviado_at, seguimiento_desde, importe, reserva_pct, cliente_id, cliente:clientes(nombre)").is("deleted_at", null),
         sb.from("eventos").select("id, presupuesto_id, cliente_id, estado, modalidad, fecha_precision, fecha_inicio, fecha_fin, montaje_inicio, desmontaje_inicio, importe, ubicacion, provincia, material, tipo_evento, es_larga_duracion, cuota_mensual, cuotas, cliente:clientes(nombre)")
           .is("deleted_at", null),
         sb.from("cobros").select("presupuesto_id, importe").is("deleted_at", null),
@@ -119,6 +128,9 @@ export function Inicio() {
                     {a.fecha === hoy ? "Hoy" : formatoFecha(a.fecha)}
                   </span>
                   <span className="flex">
+                    {a.presupuestoId && (
+                      <Button variant="outline" size="sm" className="mr-1" onClick={() => void seguimientoHecho(a.presupuestoId!)}>Ya le he escrito</Button>
+                    )}
                     {contacto?.tel && <Button variant="ghost" size="icon-sm" aria-label={`Llamar a ${a.titulo}`} render={<a href={`tel:${contacto.tel}`} />}><Phone className="size-3.5" aria-hidden /></Button>}
                     {contacto?.email && <Button variant="ghost" size="icon-sm" aria-label={`Escribir a ${a.titulo}`} render={<a href={`mailto:${contacto.email}`} />}><Mail className="size-3.5" aria-hidden /></Button>}
                   </span>

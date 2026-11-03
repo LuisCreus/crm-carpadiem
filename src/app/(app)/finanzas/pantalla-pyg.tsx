@@ -16,6 +16,7 @@ import { calcularPyg, cuotaActivo, type Activo, type EventoPyg, type Fila, type 
 import type { FacturaRentabilidad } from "@/lib/rentabilidad";
 import { crearClienteNavegador } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { COLOR, GraficoBeneficio, GraficoIngresosGastos, Ranking } from "./graficos";
 import { PestanasFinanzas } from "./pestanas";
 
 type ActivoFila = Activo & { factura_recibida_id: string | null; notas: string | null };
@@ -64,6 +65,16 @@ export function PantallaPyg({ esAdmin }: { esAdmin: boolean }) {
     tiposEvento: new Map(listas.tiposEvento.map((t) => [t.codigo, t.nombre])),
     categorias: new Map(listas.categoriasGasto.map((c) => [c.codigo, { nombre: c.nombre, tipo: c.tipo ?? "fijo" }])),
   }), [anio, datos, listas]);
+  const gastosMes = p ? p.variables.meses.map((x, i) => x + p.fijos.meses[i] + p.personal.meses[i]) : [];
+  // Todos los costes del año en una lista: los 7 mayores y el resto junto
+  const enQueSeVa = useMemo(() => {
+    if (!p) return [];
+    const todas = [...p.porVariable, ...p.porFijo, p.director, p.bonus, p.amortizacion, p.intereses]
+      .filter((f) => f.total > 0).map((f) => ({ nombre: f.clave === "director" ? "Sueldo del director" : f.nombre, total: f.total }))
+      .sort((a, b) => b.total - a.total);
+    const resto = todas.slice(7).reduce((s, f) => s + f.total, 0);
+    return resto ? [...todas.slice(0, 7), { nombre: "Resto", total: resto }] : todas;
+  }, [p]);
   const alternar = (k: string) => setAbiertos((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
 
   async function guardarManual(concepto: Manual["concepto"], i: number, importe: number | null) {
@@ -126,6 +137,15 @@ export function PantallaPyg({ esAdmin }: { esAdmin: boolean }) {
             ))}
           </div>
 
+          <div className="mb-5 grid gap-3 lg:grid-cols-2">
+            <GraficoIngresosGastos ingresos={p.ingresos.meses} gastos={gastosMes}
+              detalle={(i) => [["Ingresos", p.ingresos.meses[i]], ["Costes variables", p.variables.meses[i]], ["Costes fijos", p.fijos.meses[i]], ["Personal", p.personal.meses[i]], ["EBITDA", p.ebitda.meses[i]]]} />
+            <GraficoBeneficio neto={p.neto.meses} />
+            <Ranking titulo="¿En qué se va el dinero?" subtitulo={`${anio} · sin IVA`} color={COLOR.gastos} filas={enQueSeVa} total={enQueSeVa.reduce((s, f) => s + f.total, 0)} />
+            <Ranking titulo="¿De dónde viene?" subtitulo="facturado por tipo de evento" color={COLOR.ingresos} filas={p.porTipo} total={p.ingresos.total} />
+          </div>
+
+          <h2 className="mb-2 text-sm font-semibold">Detalle mes a mes</h2>
           <div className="overflow-x-auto rounded-xl border bg-card">
             <table className="w-full text-[13px]">
               <thead>

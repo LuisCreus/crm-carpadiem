@@ -6,6 +6,7 @@ import { Search, SlidersHorizontal } from "lucide-react";
 import { Cabecera } from "@/components/cabecera";
 import { EstadoVacio } from "@/components/estado-vacio";
 import { EtiquetaEstado } from "@/components/etiqueta-estado";
+import { cn } from "@/lib/utils";
 import { claseSelect } from "@/components/campo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -84,7 +85,7 @@ export function ListaPresupuestos() {
           <SlidersHorizontal className="size-4" aria-hidden /> Filtros{(estado || importeMin || importeMax || desde) ? " ·" : ""}
         </Button>
         <div className={verFiltros ? "flex w-full flex-wrap items-end gap-2 md:contents" : "hidden md:contents"}>
-        <select aria-label="Estado" className={`${claseSelect} h-9 w-44 bg-card`} value={estado}
+        <select aria-label="Estado" className={cn(claseSelect, "h-9 w-auto min-w-44 bg-card")} value={estado}
           onChange={(e) => setEstado(e.target.value as EstadoPresupuesto | "")}>
           <option value="">Todos los estados</option>
           {Object.entries(ESTADOS).map(([valor, e]) => <option key={valor} value={valor}>{e.texto}</option>)}

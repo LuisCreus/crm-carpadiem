@@ -6,6 +6,7 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 import { claseSelect } from "@/components/campo";
 import { HistorialDialogo } from "@/components/historial-dialogo";
 import { useTablaEnVivo } from "@/hooks/use-tabla-en-vivo";
@@ -116,7 +117,7 @@ export function AjustesAdmin({ miId }: { miId: string }) {
               </div>
               <select
                 aria-label={`Rol de ${p.email}`}
-                className={`${claseSelect} w-36`}
+                className={cn(claseSelect, "w-36")}
                 value={p.rol}
                 disabled={p.id === miId}
                 onChange={(e) => guardar(supabase.from("perfiles").update({ rol: e.target.value }).eq("id", p.id))}

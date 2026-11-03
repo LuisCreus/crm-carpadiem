@@ -6,6 +6,7 @@ import { Cabecera } from "@/components/cabecera";
 import { Etiqueta } from "@/components/etiqueta-estado";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 import { claseSelect } from "@/components/campo";
 import { formatoEuros, formatoFecha, hoyMadrid } from "@/lib/formato";
 import { pasarTrimestre, verTrimestre, type FilaGestoria, type Trimestre, type Ubicacion } from "@/lib/gestoria";
@@ -90,10 +91,10 @@ export function PantallaGestoria() {
   return (
     <>
       <Cabecera titulo="Facturas" subtitulo="Lo que hay que pasar a la gestoría cada trimestre">
-        <select aria-label="Trimestre" className={`${claseSelect} w-auto`} value={t} onChange={(e) => setT(Number(e.target.value))}>
+        <select aria-label="Trimestre" className={cn(claseSelect, "w-auto")} value={t} onChange={(e) => setT(Number(e.target.value))}>
           {[1, 2, 3, 4].map((x) => <option key={x} value={x}>{x}º trimestre</option>)}
         </select>
-        <select aria-label="Año" className={`${claseSelect} w-auto`} value={anio} onChange={(e) => setAnio(Number(e.target.value))}>
+        <select aria-label="Año" className={cn(claseSelect, "w-auto")} value={anio} onChange={(e) => setAnio(Number(e.target.value))}>
           {[anio - 1, anio, anio + 1].map((x) => <option key={x} value={x}>{x}</option>)}
         </select>
       </Cabecera>

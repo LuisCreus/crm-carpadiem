@@ -74,6 +74,20 @@ describe("avisos del Inicio", () => {
     expect(a.map((x) => x.titulo)).toEqual(["CD 079 · Ortega"]);
   });
 
+  it("presupuestos nuevos: una semana sin cambios desde que se crean, cambian de estado o se les escribe", () => {
+    const p = (id: string, estado: "borrador" | "pendiente" | "aceptado", desde: string, enviado_at: string | null = null) =>
+      ({ id, codigo: `CD ${id}`, cliente: "C", estado, enviado_at, seguimiento_desde: desde });
+    const a = calcularAvisos("2026-11-10", {
+      presupuestos: [
+        p("081", "borrador", "2026-11-02T09:00:00Z"), // creado hace 8 días y sigue en borrador
+        p("082", "pendiente", "2026-11-05T09:00:00Z", "2026-10-20T09:00:00Z"), // le escribimos el día 5: aún no toca
+        p("083", "aceptado", "2026-10-01T09:00:00Z"),
+      ], eventos: [], leads: [],
+    }, ajustes);
+    expect(a.map((x) => [x.titulo, x.fecha, x.presupuestoId])).toEqual([["CD 081 · C", "2026-11-09", "081"]]);
+    expect(a[0].detalle).toMatch(/Borrador sin cambios desde el/);
+  });
+
   it("montaje mañana, plazo de seguro y cobro pendiente tras el evento", () => {
     const a = calcularAvisos("2026-10-28", {
       presupuestos: [], leads: [],

@@ -122,10 +122,11 @@ function cantidadDe(e: EventoOcupacion, inventarioId: string) {
 // ---------------------------------------------------------------------
 
 export type TipoAviso = "seguimiento" | "accion_lead" | "montaje" | "desmontaje" | "seguro" | "cobro" | "factura" | "factura_cobro" | "pago";
-export type Aviso = { tipo: TipoAviso; fecha: string; titulo: string; detalle: string; href: string; urgente: boolean };
+export type Aviso = { tipo: TipoAviso; fecha: string; titulo: string; detalle: string; href: string; urgente: boolean; presupuestoId?: string };
 
 export type PresupuestoAvisos = {
   id: string; codigo: string; cliente: string; estado: EstadoPresupuesto; enviado_at: string | null;
+  seguimiento_desde?: string | null; // creado, último cambio de estado o último seguimiento (solo los nuevos)
 };
 export type EventoAvisos = {
   id: string; cliente: string; estado: string; modalidad: "confirmado" | "seguro";
@@ -157,8 +158,21 @@ export function calcularAvisos(
   const { hasta: finSemana } = semanaDe(hoy);
   const manana = sumarDias(hoy, 1);
 
-  // Seguimiento: enviado hace N días o más y sigue Pendiente
+  // Seguimiento: N días (7) sin cambios desde que se creó, cambió de estado o se le escribió al cliente
   for (const p of datos.presupuestos) {
+    if (p.seguimiento_desde) {
+      if (p.estado !== "borrador" && p.estado !== "pendiente") continue;
+      const desde = diaDe(p.seguimiento_desde)!;
+      const toca = sumarDias(desde, ajustes.diasSeguimiento);
+      if (toca <= hoy) {
+        avisos.push({
+          tipo: "seguimiento", fecha: toca, titulo: `${p.codigo} · ${p.cliente}`, href: `/presupuestos/${p.id}`, urgente: true, presupuestoId: p.id,
+          detalle: `${p.estado === "borrador" ? "Borrador" : "Pendiente"} sin cambios desde el ${formatoCorto(desde)} · escribe al cliente`,
+        });
+      }
+      continue;
+    }
+    // Los de antes: enviado hace N días o más y sigue Pendiente
     if (p.estado !== "pendiente" || !p.enviado_at) continue;
     const toca = sumarDias(diaDe(p.enviado_at)!, ajustes.diasSeguimiento);
     if (toca <= hoy) {

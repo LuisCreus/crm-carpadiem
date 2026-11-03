@@ -5,6 +5,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 import { Cabecera } from "@/components/cabecera";
+import { cn } from "@/lib/utils";
 import { claseSelect } from "@/components/campo";
 import { EstadoVacio } from "@/components/estado-vacio";
 import { HistorialDialogo } from "@/components/historial-dialogo";
@@ -112,7 +113,7 @@ export function TablaInventario() {
                   <Input aria-label="Unidad" defaultValue={i.unidad} className="h-8 w-20" onBlur={(e) => cambiar(i, "unidad", e.target.value.trim())} />
                 </td>
                 <td className="px-3 py-1.5">
-                  <select aria-label="Propiedad" className={`${claseSelect} w-36`} defaultValue={i.propiedad} onChange={(e) => cambiar(i, "propiedad", e.target.value)}>
+                  <select aria-label="Propiedad" className={cn(claseSelect, "w-36")} defaultValue={i.propiedad} onChange={(e) => cambiar(i, "propiedad", e.target.value)}>
                     <option value="propio">Propio</option>
                     <option value="subalquilado">Subalquilado</option>
                   </select>
@@ -137,7 +138,7 @@ export function TablaInventario() {
                   <Input aria-label="Cantidad" type="number" min={0} placeholder="Cant." className="w-24 bg-card"
                     value={nuevo.cantidad} onChange={(e) => setNuevo({ ...nuevo, cantidad: e.target.value })} />
                   <Input aria-label="Unidad" className="w-20 bg-card" value={nuevo.unidad} onChange={(e) => setNuevo({ ...nuevo, unidad: e.target.value })} />
-                  <select aria-label="Propiedad" className={`${claseSelect} w-36 bg-card`} value={nuevo.propiedad}
+                  <select aria-label="Propiedad" className={cn(claseSelect, "w-36 bg-card")} value={nuevo.propiedad}
                     onChange={(e) => setNuevo({ ...nuevo, propiedad: e.target.value as Item["propiedad"] })}>
                     <option value="propio">Propio</option>
                     <option value="subalquilado">Subalquilado</option>

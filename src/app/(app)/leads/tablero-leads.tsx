@@ -152,12 +152,12 @@ export function TableroLeads({ nombreUsuario }: { nombreUsuario: string }) {
           <input type="search" aria-label="Buscar leads" placeholder="Buscar…" className="min-w-0 flex-1 bg-transparent outline-none"
             value={texto} onChange={(e) => setTexto(e.target.value)} />
         </label>
-        <select aria-label="Comercial" className={`${claseSelect} h-9 w-40 bg-card`} value={filtroComercial} onChange={(e) => setFiltroComercial(e.target.value)}>
+        <select aria-label="Comercial" className={cn(claseSelect, "h-9 w-auto min-w-40 bg-card")} value={filtroComercial} onChange={(e) => setFiltroComercial(e.target.value)}>
           <option value="">Todos los comerciales</option>
           {listas.comerciales.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
         </select>
         {vista === "tabla" && (
-          <select aria-label="Estado" className={`${claseSelect} h-9 w-44 bg-card`} value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
+          <select aria-label="Estado" className={cn(claseSelect, "h-9 w-auto min-w-44 bg-card")} value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
             <option value="">Todos los estados</option>
             {ESTADOS_LEAD.map((e) => <option key={e.valor} value={e.valor}>{e.texto}</option>)}
           </select>
