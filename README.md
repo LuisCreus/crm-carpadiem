@@ -24,6 +24,7 @@ CRM web de CARPADIEM IBÉRICA S.L. para gestionar leads, presupuestos (con la pl
 | 14 | Facturas recibidas de proveedores (gastos por evento o generales) → PENDIENTE SARA/02. RECIBIDAS | Hecha |
 | 15 | Pagos a proveedores: fichero SEPA XML para Santander Empresas; Contactos (proveedores + intermediarios) | Hecha |
 | 16 | Rentabilidad por evento (mes a mes) y «Pasar a la gestoría» por trimestre (mueve PDF, Excel resumen, borrador en Outlook) | Hecha |
+| 17 | Conciliar con el banco: se sube el extracto del Santander (Norma 43, Excel o CSV) y cada movimiento se enlaza con su factura, se apunta como gasto (con reglas que se recuerdan) o se ignora | Hecha |
 
 ## Piezas
 
