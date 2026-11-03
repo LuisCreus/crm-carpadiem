@@ -22,7 +22,8 @@ CRM web de CARPADIEM IBÉRICA S.L. para gestionar leads, presupuestos (con la pl
 | 12 | PDF de las facturas con la plantilla de la hoja Emitir (02. PLANTILLAS/03. FACTURAS) → PENDIENTE SARA | Hecha |
 | 13 | Botón «Correo»: borrador en Outlook (lcreus@carpa-diem.com) con el PDF de la factura | Hecha |
 | 14 | Facturas recibidas de proveedores (gastos por evento o generales) → PENDIENTE SARA/02. RECIBIDAS | Hecha |
-| 15–16 | Pagos con Santander (fichero SEPA), rentabilidad por evento y paso a la gestoría | Pendiente |
+| 15 | Pagos a proveedores: fichero SEPA XML para Santander Empresas; Contactos (proveedores + intermediarios) | Hecha |
+| 16 | Rentabilidad por evento y paso a la gestoría | Pendiente |
 
 ## Piezas
 
