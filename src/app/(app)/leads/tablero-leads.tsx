@@ -49,6 +49,7 @@ type Lead = {
   que_pide: string | null;
   proxima_accion_fecha: string | null;
   proxima_accion_texto: string | null;
+  reunion_at: string | null; // reunión agendada (sale en Inicio)
   comentarios: string | null;
   estado: EstadoLead;
   orden_kanban: number;
@@ -58,6 +59,14 @@ type Lead = {
 type Borrador = Omit<Lead, "id" | "orden_kanban" | "comercial"> & { id?: string };
 
 const hoy = () => hoyMadrid();
+// Fecha y hora para el campo "datetime-local" (hora de este ordenador/móvil) y para mostrarla
+const aLocal = (iso: string | null) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+};
+const fechaHoraCorta = (iso: string) =>
+  new Date(iso).toLocaleString("es-ES", { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" });
 
 export function TableroLeads({ nombreUsuario }: { nombreUsuario: string }) {
   const { enCurso, unaVez } = useUnaVez();
@@ -78,7 +87,7 @@ export function TableroLeads({ nombreUsuario }: { nombreUsuario: string }) {
   const [editando, setEditando] = useState<Borrador | null>(() => (abrirNuevo ? {
     comercial_id: null, fecha_primer_contacto: hoy(), cliente_nombre: "", contacto_nombre: "", telefono: "", email: "",
     tipo_cliente: "particular", canal: "email", fecha_evento_aprox: "", lugar_aprox: "", que_pide: "",
-    proxima_accion_fecha: null, proxima_accion_texto: "", comentarios: "", estado: "por_contactar",
+    proxima_accion_fecha: null, proxima_accion_texto: "", reunion_at: null, comentarios: "", estado: "por_contactar",
   } : null));
   const [arrastrando, setArrastrando] = useState<string | null>(null);
 
@@ -87,7 +96,7 @@ export function TableroLeads({ nombreUsuario }: { nombreUsuario: string }) {
   const nuevo = (): Borrador => ({
     comercial_id: comercialPropio?.id ?? null, fecha_primer_contacto: hoy(), cliente_nombre: "", contacto_nombre: "",
     telefono: "", email: "", tipo_cliente: "particular", canal: "email", fecha_evento_aprox: "", lugar_aprox: "",
-    que_pide: "", proxima_accion_fecha: null, proxima_accion_texto: "", comentarios: "", estado: "por_contactar",
+    que_pide: "", proxima_accion_fecha: null, proxima_accion_texto: "", reunion_at: null, comentarios: "", estado: "por_contactar",
   });
 
   const filtrados = useMemo(() => {
@@ -103,8 +112,10 @@ export function TableroLeads({ nombreUsuario }: { nombreUsuario: string }) {
   async function guardar(e: FormEvent) {
     e.preventDefault();
     if (!editando) return;
-    const { id, ...campos } = editando;
-    const fila = Object.fromEntries(Object.entries(campos).map(([k, v]) => [k, v === "" ? null : v]));
+    const { id } = editando;
+    // Solo los campos del formulario (al editar, el lead trae también datos de pantalla, como el comercial)
+    const campos = Object.keys(nuevo()) as (keyof Borrador)[];
+    const fila = Object.fromEntries(campos.map((k) => [k, editando[k] === "" ? null : editando[k]]));
     fila.cliente_nombre = editando.cliente_nombre.trim();
     const { error } = id ? await sb.from("leads").update(fila).eq("id", id) : await sb.from("leads").insert(fila);
     if (error) return toast.error(error.message);
@@ -193,6 +204,9 @@ export function TableroLeads({ nombreUsuario }: { nombreUsuario: string }) {
                       <div className="mt-1.5 text-xs text-muted-foreground">
                         {[l.fecha_evento_aprox, l.lugar_aprox].filter(Boolean).join(" · ")}
                       </div>
+                      {l.reunion_at && l.reunion_at.slice(0, 10) >= hoy() && (
+                        <div className="mt-1.5 text-xs font-medium text-[#2F5D70]">Reunión · {fechaHoraCorta(l.reunion_at)}</div>
+                      )}
                       {l.proxima_accion_fecha && (
                         <div className={cn("mt-1.5 text-xs", accionVencida(l) ? "font-medium text-[#B0302A]" : "text-muted-foreground")}>
                           {formatoFecha(l.proxima_accion_fecha)} · {l.proxima_accion_texto || "Próxima acción"}
@@ -294,6 +308,10 @@ export function TableroLeads({ nombreUsuario }: { nombreUsuario: string }) {
               </Campo>
               <Campo id="l-accion" etiqueta="Próxima acción">
                 <Input id="l-accion" placeholder="Llamar para cerrar visita" value={editando.proxima_accion_texto ?? ""} onChange={(e) => setEditando({ ...editando, proxima_accion_texto: e.target.value })} />
+              </Campo>
+              <Campo id="l-reunion" etiqueta="Reunión agendada (sale en Inicio)" className="sm:col-span-2">
+                <Input id="l-reunion" type="datetime-local" value={aLocal(editando.reunion_at)}
+                  onChange={(e) => setEditando({ ...editando, reunion_at: e.target.value ? new Date(e.target.value).toISOString() : null })} />
               </Campo>
               <details className="sm:col-span-2" open={!!editando.id}>
                 <summary className="cursor-pointer text-sm text-muted-foreground">Más datos</summary>

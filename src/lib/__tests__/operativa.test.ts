@@ -192,3 +192,23 @@ describe("números del Inicio", () => {
       .toEqual({ cobradas: 0, pendientes: 0, sinDatos: 1 });
   });
 });
+
+describe("recordatorios de leads", () => {
+  const ajustes = { diasSeguimiento: 7, diasLimiteSeguro: 10, diasAvisoSeguro: 3 };
+  const lead = (x: Record<string, unknown>) => ({ id: "l", cliente_nombre: "Catering La Blonda", estado: "interesado", proxima_accion_fecha: null, proxima_accion_texto: null, ...x });
+  it("reunión agendada: sale la semana antes y el mismo día", () => {
+    const a = calcularAvisos("2026-11-04", { presupuestos: [], eventos: [], leads: [
+      lead({ id: "r1", reunion_at: "2026-11-05T10:00:00Z", contacto_nombre: "Jimena Moreno", seguimiento_desde: "2026-11-04T09:00:00Z" }),
+      lead({ id: "r2", reunion_at: "2026-11-20T10:00:00Z", seguimiento_desde: "2026-11-04T09:00:00Z" }),
+    ] }, ajustes);
+    expect(a.map((x) => [x.tipo, x.titulo, x.detalle])).toEqual([["reunion", "Reunión con Catering La Blonda", "Mañana a las 11:00 · Jimena Moreno"]]);
+  });
+  it("una semana sin avances y sin nada agendado: recordatorio", () => {
+    const a = calcularAvisos("2026-11-12", { presupuestos: [], eventos: [], leads: [
+      lead({ id: "parado", seguimiento_desde: "2026-11-04T09:00:00Z" }),
+      lead({ id: "con-accion", seguimiento_desde: "2026-11-01T09:00:00Z", proxima_accion_fecha: "2026-11-20" }),
+      lead({ id: "ganado", estado: "ganado", seguimiento_desde: "2026-10-01T09:00:00Z" }),
+    ] }, ajustes);
+    expect(a.filter((x) => x.tipo === "lead_parado").map((x) => x.leadId)).toEqual(["parado"]);
+  });
+});

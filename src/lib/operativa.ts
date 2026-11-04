@@ -124,8 +124,8 @@ function cantidadDe(e: EventoOcupacion, inventarioId: string) {
 // Avisos (Inicio)
 // ---------------------------------------------------------------------
 
-export type TipoAviso = "seguimiento" | "accion_lead" | "montaje" | "desmontaje" | "seguro" | "cobro" | "factura" | "factura_cobro" | "pago";
-export type Aviso = { tipo: TipoAviso; fecha: string; titulo: string; detalle: string; href: string; urgente: boolean; presupuestoId?: string };
+export type TipoAviso = "seguimiento" | "accion_lead" | "reunion" | "lead_parado" | "montaje" | "desmontaje" | "seguro" | "cobro" | "factura" | "factura_cobro" | "pago";
+export type Aviso = { tipo: TipoAviso; fecha: string; titulo: string; detalle: string; href: string; urgente: boolean; presupuestoId?: string; leadId?: string };
 
 export type PresupuestoAvisos = {
   id: string; codigo: string; cliente: string; estado: EstadoPresupuesto; enviado_at: string | null;
@@ -142,7 +142,10 @@ export type FacturaAvisos = {
   id: string; evento_id: string | null; tipo: string; estado: string; importe: number;
   codigo: string | null; fecha_emision: string | null; correo_preparado_at?: string | null;
 };
-export type LeadAvisos = { id: string; cliente_nombre: string; estado: string; proxima_accion_fecha: string | null; proxima_accion_texto: string | null };
+export type LeadAvisos = {
+  id: string; cliente_nombre: string; estado: string; proxima_accion_fecha: string | null; proxima_accion_texto: string | null;
+  reunion_at?: string | null; seguimiento_desde?: string | null; contacto_nombre?: string | null;
+};
 
 export type AjustesAvisos = {
   diasSeguimiento: number; diasLimiteSeguro: number; diasAvisoSeguro: number;
@@ -181,6 +184,31 @@ export function calcularAvisos(
     if (toca <= hoy) {
       avisos.push({ tipo: "seguimiento", fecha: toca, titulo: `${p.codigo} · ${p.cliente}`, detalle: `Enviado el ${formatoCorto(diaDe(p.enviado_at)!)} · sin respuesta`, href: `/presupuestos/${p.id}`, urgente: true });
     }
+  }
+
+  // Reuniones agendadas con leads: desde una semana antes hasta el mismo día
+  for (const l of datos.leads) {
+    if (!l.reunion_at || ["perdido"].includes(l.estado)) continue;
+    const dia = diaDe(l.reunion_at)!;
+    if (dia < hoy || dia > sumarDias(hoy, 7)) continue;
+    const hora = new Date(l.reunion_at).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" });
+    avisos.push({
+      tipo: "reunion", fecha: dia, titulo: `Reunión con ${l.cliente_nombre}`, href: "/leads", urgente: dia <= sumarDias(hoy, 1),
+      detalle: `${dia === hoy ? "Hoy" : dia === sumarDias(hoy, 1) ? "Mañana" : formatoCorto(dia)} a las ${hora}${l.contacto_nombre ? ` · ${l.contacto_nombre}` : ""}`,
+    });
+  }
+
+  // Leads sin avances en una semana (y sin nada pendiente agendado): ¿sigue adelante o se ha caído?
+  for (const l of datos.leads) {
+    if (!l.seguimiento_desde || ["ganado", "perdido", "presupuesto_enviado"].includes(l.estado)) continue;
+    if ((l.proxima_accion_fecha && l.proxima_accion_fecha >= hoy) || (l.reunion_at && diaDe(l.reunion_at)! >= hoy)) continue;
+    const desde = diaDe(l.seguimiento_desde)!;
+    const toca = sumarDias(desde, ajustes.diasSeguimiento);
+    if (toca > hoy) continue;
+    avisos.push({
+      tipo: "lead_parado", fecha: toca, titulo: l.cliente_nombre, href: "/leads", urgente: false, leadId: l.id,
+      detalle: `Sin avances desde el ${formatoCorto(desde)}: ¿sigue adelante o se ha caído?`,
+    });
   }
 
   // Próximas acciones de leads, vencidas o de esta semana

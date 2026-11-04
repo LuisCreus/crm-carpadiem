@@ -18,6 +18,8 @@ import { cn } from "@/lib/utils";
 const TIPOS: Record<TipoAviso, { texto: string; clase: string }> = {
   seguimiento: { texto: "Seguimiento", clase: "bg-[#EEF4F7] text-[#2F5D70]" },
   accion_lead: { texto: "Lead", clase: "bg-[#EEF4F7] text-[#2F5D70]" },
+  reunion: { texto: "Reunión", clase: "bg-[#E8F4EC] text-[#25683D]" },
+  lead_parado: { texto: "Lead sin avances", clase: "bg-[#FDF3E1] text-[#8A5A0B]" },
   montaje: { texto: "Montaje", clase: "bg-[#FDEDEC] text-[#B0302A]" },
   desmontaje: { texto: "Desmontaje", clase: "bg-[#F2F1EE] text-[#4B4B48]" },
   seguro: { texto: "Seguro de lluvia", clase: "bg-[#FDF3E1] text-[#8A5A0B]" },
@@ -39,6 +41,13 @@ export function Inicio() {
   const hoy = hoyMadrid();
   const [periodo, setPeriodo] = useState<"mes" | "anio">("mes");
 
+  // El lead sigue vivo: el recordatorio vuelve a salir dentro de una semana si no cambia nada
+  async function leadSigue(id: string) {
+    const { error } = await crearClienteNavegador().from("leads").update({ seguimiento_desde: new Date().toISOString() }).eq("id", id);
+    if (error) toast.error(error.message);
+    else toast.success("Anotado ✓ · Te lo recuerdo en una semana si no avanza");
+  }
+
   // El recordatorio vuelve a salir dentro de una semana si el presupuesto sigue igual
   async function seguimientoHecho(id: string) {
     const { error } = await crearClienteNavegador().from("presupuestos").update({ seguimiento_desde: new Date().toISOString() }).eq("id", id);
@@ -54,7 +63,7 @@ export function Inicio() {
         sb.from("eventos").select("id, presupuesto_id, cliente_id, estado, modalidad, fecha_precision, fecha_inicio, fecha_fin, montaje_inicio, desmontaje_inicio, importe, ubicacion, provincia, material, tipo_evento, es_larga_duracion, cuota_mensual, cuotas, cliente:clientes(nombre)")
           .is("deleted_at", null),
         sb.from("cobros").select("presupuesto_id, importe").is("deleted_at", null),
-        sb.from("leads").select("id, cliente_nombre, estado, proxima_accion_fecha, proxima_accion_texto").is("deleted_at", null),
+        sb.from("leads").select("id, cliente_nombre, contacto_nombre, estado, proxima_accion_fecha, proxima_accion_texto, reunion_at, seguimiento_desde").is("deleted_at", null),
         sb.from("ajustes").select("dias_seguimiento, dias_limite_seguro, dias_aviso_seguro, dias_aviso_resto, dias_aviso_cobro_factura, dias_aviso_pago").maybeSingle(),
         // Las pagadas solo hacen falta para contar las mensualidades ya facturadas
         sb.from("facturas").select("id, evento_id, tipo, estado, importe, codigo, fecha_emision, correo_preparado_at").is("deleted_at", null).or("estado.neq.pagada,tipo.eq.mensualidad"),
@@ -140,6 +149,9 @@ export function Inicio() {
                     {a.fecha === hoy ? "Hoy" : formatoFecha(a.fecha)}
                   </span>
                   <span className="flex">
+                    {a.leadId && (
+                      <Button variant="outline" size="sm" className="mr-1" onClick={() => void leadSigue(a.leadId!)}>Seguimos en contacto</Button>
+                    )}
                     {a.presupuestoId && (
                       <Button variant="outline" size="sm" className="mr-1" onClick={() => void seguimientoHecho(a.presupuestoId!)}>Ya le he escrito</Button>
                     )}
