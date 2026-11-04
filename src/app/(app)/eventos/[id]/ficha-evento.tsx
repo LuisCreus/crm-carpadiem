@@ -28,7 +28,7 @@ import { TarjetaGastos } from "./gastos";
 import { TarjetaRentabilidad } from "./rentabilidad";
 import { useEsAdmin } from "@/components/usuario";
 import {
-  TarjetaControlMaterial, TarjetaMaterialReservado, type ItemInventario, type MovimientoMaterial, type ReservaMaterial,
+  TarjetaControlMaterial, TarjetaMaterialCargar, type ItemInventario, type MovimientoMaterial, type ReservaMaterial,
 } from "./material";
 
 type Datos = {
@@ -107,7 +107,7 @@ export function FichaEvento({ id }: { id: string }) {
   if (cargando) return <p className="text-sm text-muted-foreground">Cargando…</p>;
   if (error && !d) return <p role="alert" className="text-sm text-destructive">No se ha podido cargar el evento ({error}). <button type="button" className="underline" onClick={() => void recargar()}>Reintentar</button></p>;
   if (!d) return <p className="text-sm text-muted-foreground">Este evento no existe o está en la papelera.</p>;
-  const { e, contactos, cobrado, montadores, movimientos, reservas, inventario, solapes } = d;
+  const { e, contactos, cobrado, montadores, movimientos, inventario } = d;
   const sb = crearClienteNavegador();
   const direccion = [e.ubicacion, e.provincia].filter(Boolean).join(", ");
   const limite = e.modalidad === "seguro" && e.fecha_precision === "dia" && e.fecha_inicio ? fechaLimiteSeguro(e.fecha_inicio, d.diasSeguro) : null;
@@ -228,7 +228,7 @@ export function FichaEvento({ id }: { id: string }) {
           <TarjetaGastos eventoId={e.id} />
           {esAdmin && <TarjetaRentabilidad eventoId={e.id} />}
           <TarjetaMontaje key={e.id + (e.montaje_inicio ?? "")} evento={e} contactos={contactos} montadoresAsignados={montadores} />
-          <TarjetaMaterialReservado eventoId={e.id} reservas={reservas} inventario={inventario} solapes={solapes} />
+          <TarjetaMaterialCargar eventoId={e.id} />
           <TarjetaControlMaterial eventoId={e.id} movimientos={movimientos} inventario={inventario} />
         </div>
       </div>

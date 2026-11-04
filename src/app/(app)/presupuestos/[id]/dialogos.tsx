@@ -14,6 +14,8 @@ import { formatoEuros, hoyMadrid, leerEuros } from "@/lib/formato";
 import type { PrecisionFecha } from "@/lib/negocio";
 import { cn } from "@/lib/utils";
 import { useUnaVez } from "@/hooks/use-una-vez";
+import { CamposMaterial, cantidadesDePresupuesto, columnasMaterial } from "@/components/campos-material";
+import type { Cantidades } from "@/lib/material";
 
 type Abierto = { abierto: boolean; cerrar: () => void };
 
@@ -177,6 +179,7 @@ export function DialogoDatos({ abierto, cerrar, presupuesto }: Abierto & { presu
     plantilla: p.plantilla,
   });
   const set = (k: keyof typeof campos, v: string) => setCampos({ ...campos, [k]: v });
+  const [cantidades, setCantidades] = useState<Cantidades>(cantidadesDePresupuesto(p));
 
   async function guardar(e: FormEvent) {
     e.preventDefault();
@@ -191,6 +194,7 @@ export function DialogoDatos({ abierto, cerrar, presupuesto }: Abierto & { presu
       ubicacion: campos.ubicacion.trim() || null,
       provincia: campos.provincia.trim() || null,
       material: campos.material.trim() || null,
+      ...columnasMaterial(cantidades),
       comercial_id: campos.comercial_id || null,
       intermediario_id: campos.intermediario_id || null,
       comision_pct: campos.intermediario_id && campos.comision_pct !== "" ? Number(campos.comision_pct) : null,
@@ -265,6 +269,9 @@ export function DialogoDatos({ abierto, cerrar, presupuesto }: Abierto & { presu
           <Campo id="d-material" etiqueta="Material" className="sm:col-span-2">
             <Textarea id="d-material" rows={2} value={campos.material} onChange={(e) => set("material", e.target.value)} />
           </Campo>
+          <CamposMaterial material={campos.material} valor={cantidades} cambiar={setCantidades} presupuestoId={p.id}
+            aManoInicial={Boolean(p.uds_beduinas || p.uds_modulares || Number(p.m2_tarima) || p.uds_sombrillas)}
+            fechas={{ precision, inicio: precision === "dia" ? fecha || null : precision === "mes" && mes ? `${mes}-01` : null, fin: precision === "dia" ? fechaFin || null : null }} />
           <Campo id="d-comercial" etiqueta="Comercial">
             <select id="d-comercial" className={claseSelect} value={campos.comercial_id} onChange={(e) => set("comercial_id", e.target.value)}>
               <option value="">—</option>

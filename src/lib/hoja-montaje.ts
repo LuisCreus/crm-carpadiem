@@ -7,6 +7,7 @@ import type { crearClienteServidor } from "@/lib/supabase/server";
 import { LOGO_PNG_BASE64 } from "@/lib/logo-base64";
 import { uno } from "@/lib/datos/tipos";
 import { diaSemana, enlaceMaps, nombreHojaMontaje, textoFechaEvento, type PrecisionFecha } from "@/lib/negocio";
+import { cantidadesDe, piezasParaMontar, textoCantidades, type FilaCantidades, type Recurso } from "@/lib/material";
 
 export type DatosHoja = {
   numero: number | null;
@@ -27,6 +28,9 @@ export type DatosHoja = {
   desmontajeFin: string | null;
   material: string | null;
   materialReservado: { material: string; cantidad: number; unidad: string }[];
+  // Lo que hay que cargar: el kit de cada carpa por las carpas del presupuesto
+  resumenMaterial: string;
+  piezas: { material: string; cantidad: number; grupo: string | null; falta: number }[];
   montadores: string[];
   observaciones: string | null;
   carpetaRuta: string | null;
@@ -37,14 +41,21 @@ type Supabase = Awaited<ReturnType<typeof crearClienteServidor>>;
 export async function cargarDatosHoja(sb: Supabase, eventoId: string): Promise<DatosHoja | null> {
   const { data: e } = await sb
     .from("eventos")
-    .select("*, cliente:clientes(nombre), presupuesto:presupuestos(numero, anio, codigo, sp_carpeta_ruta), tipo:tipos_evento(nombre), contacto:contactos!eventos_contacto_destino_id_fkey(nombre, telefono)")
+    .select("*, cliente:clientes(nombre), presupuesto:presupuestos(numero, anio, codigo, sp_carpeta_ruta, uds_beduinas, uds_modulares, m2_tarima, uds_sombrillas, material), tipo:tipos_evento(nombre), contacto:contactos!eventos_contacto_destino_id_fkey(nombre, telefono)")
     .eq("id", eventoId)
     .maybeSingle();
   if (!e) return null;
-  const [mo, mat] = await Promise.all([
+  const [mo, mat, kit] = await Promise.all([
     sb.from("evento_montadores").select("montador:montadores(nombre)").eq("evento_id", eventoId),
     sb.from("evento_material").select("cantidad, inventario:inventario(material, unidad)").eq("evento_id", eventoId),
+    sb.from("kit_material").select("recurso, por_unidad, inventario:inventario(id, material, cantidad, grupo, orden, deleted_at)"),
   ]);
+  const cantidades = cantidadesDe(uno(e.presupuesto) as FilaCantidades | null, e.material);
+  const piezasKit = (kit.data ?? [])
+    .map((k) => ({ k, i: uno(k.inventario) as { id: string; material: string; cantidad: number; grupo: string | null; orden: number; deleted_at: string | null } | null }))
+    .filter(({ i }) => i && !i.deleted_at)
+    .sort((a, b) => a.i!.orden - b.i!.orden)
+    .map(({ k, i }) => ({ recurso: k.recurso as Recurso, inventarioId: i!.id, material: i!.material, porUnidad: Number(k.por_unidad), stock: Number(i!.cantidad), grupo: i!.grupo }));
   const presupuesto = uno(e.presupuesto) as { numero: number; anio: number; codigo: string; sp_carpeta_ruta: string | null } | null;
   return {
     numero: presupuesto?.numero ?? null,
@@ -68,6 +79,8 @@ export async function cargarDatosHoja(sb: Supabase, eventoId: string): Promise<D
       const inv = uno(m.inventario) as { material: string; unidad: string } | null;
       return { material: inv?.material ?? "", cantidad: Number(m.cantidad), unidad: inv?.unidad ?? "" };
     }),
+    resumenMaterial: textoCantidades(cantidades),
+    piezas: piezasParaMontar(cantidades, piezasKit),
     montadores: (mo.data ?? []).map((m) => (uno(m.montador) as { nombre: string } | null)?.nombre ?? "").filter(Boolean),
     observaciones: e.observaciones_montaje,
     carpetaRuta: presupuesto?.sp_carpeta_ruta ?? null,
@@ -204,6 +217,36 @@ export async function generarPdfHoja(d: DatosHoja): Promise<Uint8Array> {
   seccion("Montadores", d.montadores.join(", ") || "Por asignar");
   const materialReservado = d.materialReservado.map((m) => `· ${m.cantidad} ${m.unidad} ${m.material}`).join("\n");
   seccion("Material", [d.material, materialReservado].filter(Boolean).join("\n") || "—");
+  // Material a cargar, pieza a pieza, con una casilla para marcar (lo prepara el almacén y lo comprueban los montadores)
+  if (d.piezas.length) {
+    nuevaPaginaSiHaceFalta(60);
+    pagina.drawText("MATERIAL A CARGAR", { x: margen, y, size: 8.5, font: negrita, color: CORAL });
+    pagina.drawText(limpio(normal, d.resumenMaterial), { x: margen + 110, y, size: 8.5, font: normal, color: GRIS });
+    y -= 17;
+    let grupoActual: string | null = "";
+    for (const p of d.piezas) {
+      if (p.grupo !== grupoActual) {
+        grupoActual = p.grupo;
+        nuevaPaginaSiHaceFalta(30);
+        y -= 3;
+        pagina.drawText(limpio(negrita, p.grupo ?? "Otros"), { x: margen, y, size: 9.5, font: negrita, color: TEXTO });
+        y -= 14;
+      }
+      nuevaPaginaSiHaceFalta(16);
+      pagina.drawRectangle({ x: margen, y: y - 1.5, width: 9, height: 9, borderColor: GRIS, borderWidth: 0.8 });
+      const cantidad = String(p.cantidad);
+      pagina.drawText(cantidad, { x: margen + 40 - negrita.widthOfTextAtSize(cantidad, 10.5), y, size: 10.5, font: negrita, color: TEXTO });
+      pagina.drawText(limpio(normal, p.material), { x: margen + 50, y, size: 10.5, font: normal, color: TEXTO });
+      if (p.falta > 0) {
+        const aviso = `faltan ${p.falta}: alquilar`;
+        pagina.drawText(aviso, { x: margen + ancho - normal.widthOfTextAtSize(aviso, 9.5), y, size: 9.5, font: normal, color: CORAL });
+      }
+      y -= 15;
+    }
+    y -= 8;
+    pagina.drawLine({ start: { x: margen, y: y + 4 }, end: { x: margen + ancho, y: y + 4 }, thickness: 0.6, color: LINEA });
+    y -= 12;
+  }
   seccion("Observaciones", d.observaciones || "—");
 
   // Pie

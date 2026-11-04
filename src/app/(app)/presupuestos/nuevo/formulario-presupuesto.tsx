@@ -10,6 +10,8 @@ import { Campo, claseSelect } from "@/components/campo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { CamposMaterial, columnasMaterial } from "@/components/campos-material";
+import { SIN_MATERIAL, type Cantidades } from "@/lib/material";
 import { useListas } from "@/hooks/use-listas";
 import { crearClienteNavegador } from "@/lib/supabase/client";
 import { uno } from "@/lib/datos/tipos";
@@ -43,6 +45,7 @@ export function FormularioPresupuesto({ nombreUsuario, leadId, duplicarId, opcio
   const [ubicacion, setUbicacion] = useState("");
   const [provincia, setProvincia] = useState("");
   const [material, setMaterial] = useState("");
+  const [cantidades, setCantidades] = useState<Cantidades>(SIN_MATERIAL);
   const [comercialId, setComercialId] = useState("");
   const [reserva, setReserva] = useState<string | null>(null);
   const [plantilla, setPlantilla] = useState<"carpadiem" | "neutra">("carpadiem");
@@ -173,6 +176,7 @@ export function FormularioPresupuesto({ nombreUsuario, leadId, duplicarId, opcio
       return;
     }
     const creado = data as { id: string; codigo: string };
+    await crearClienteNavegador().from("presupuestos").update(columnasMaterial(cantidades)).eq("id", creado.id);
     toast.success(`${creado.codigo} creado ✓`);
 
     // Carpeta + Word en SharePoint (si falla, el presupuesto ya está creado y se puede reintentar)
@@ -299,6 +303,8 @@ export function FormularioPresupuesto({ nombreUsuario, leadId, duplicarId, opcio
           <Campo id="material" etiqueta="Descripción breve del material" className="sm:col-span-2">
             <Textarea id="material" rows={2} placeholder="2 beduinas 12x15 + tarima 72 m²" value={material} onChange={(e) => setMaterial(e.target.value)} />
           </Campo>
+          <CamposMaterial material={material} valor={cantidades} cambiar={setCantidades}
+            fechas={{ precision, inicio: precision === "dia" ? fecha || null : precision === "mes" && mes ? `${mes}-01` : null, fin: precision === "dia" ? fechaFin || null : null }} />
         </section>
 
         <section className="grid gap-4 rounded-xl border bg-card p-5 sm:grid-cols-2">

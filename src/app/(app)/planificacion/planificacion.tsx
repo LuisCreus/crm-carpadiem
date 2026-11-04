@@ -8,6 +8,8 @@ import { Etiqueta, CLASE_CONFIRMADO, CLASE_SEGURO } from "@/components/etiqueta-
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { textoCobro, useEventos } from "@/hooks/use-eventos";
+import { rango, useDisponibilidad } from "@/hooks/use-disponibilidad";
+import { textoFalta } from "@/lib/disponibilidad";
 import { nombreDe, useListas } from "@/hooks/use-listas";
 import { useTablaEnVivo } from "@/hooks/use-tabla-en-vivo";
 import { uno } from "@/lib/datos/tipos";
@@ -31,6 +33,7 @@ type Tarjeta = ItemFecha & {
   cobro?: { texto: string; completo: boolean };
   montaje?: string | null; // fecha y hora (ISO) del montaje
   desmontaje?: string | null;
+  avisos?: string[]; // falta material (carpas, tarima, sombrillas)
 };
 
 type PresuPendiente = {
@@ -49,6 +52,7 @@ export function Planificacion({ mesDetalle }: { mesDetalle?: string }) {
   const [abiertos, setAbiertos] = useState<Set<string>>(() => new Set([hoy.slice(0, 7)]));
 
   const eventos = useEventos();
+  const disponible = useDisponibilidad();
   const pendientes = useTablaEnVivo<PresuPendiente>(["presupuestos", "clientes"], async (sb) => {
     const { data } = await sb.from("presupuestos")
       .select("id, codigo, fecha_precision, fecha_evento, fecha_fin, material, ubicacion, provincia, importe, tipo_evento, cliente:clientes(nombre)")
@@ -62,14 +66,18 @@ export function Planificacion({ mesDetalle }: { mesDetalle?: string }) {
       cliente: e.cliente?.nombre ?? "", tipo: nombreDe(listas.tiposEvento, e.tipo_evento), material: e.material ?? "",
       lugar: [e.ubicacion, e.provincia].filter(Boolean).join(", "), importe: e.importe,
       clase: e.modalidad, cobro: textoCobro(e, formatoEuros), montaje: e.montaje_inicio, desmontaje: e.desmontaje_inicio,
+      avisos: disponible.avisos.get(e.id),
     }));
     if (!verPendientes) return ev;
     return [...ev, ...pendientes.datos.map((p): Tarjeta => ({
       id: p.id, href: `/presupuestos/${p.id}`, fecha_precision: p.fecha_precision, inicio: p.fecha_evento, fin: p.fecha_fin,
       cliente: `${p.codigo} · ${p.cliente?.nombre ?? ""}`, tipo: nombreDe(listas.tiposEvento, p.tipo_evento), material: p.material ?? "",
       lugar: [p.ubicacion, p.provincia].filter(Boolean).join(", "), importe: p.importe !== null ? Number(p.importe) : null, clase: "pendiente",
+      avisos: disponible.avisos.get(p.id),
     }))];
-  }, [eventos.datos, pendientes.datos, verPendientes, listas.tiposEvento]);
+  }, [eventos.datos, pendientes.datos, verPendientes, listas.tiposEvento, disponible.avisos]);
+  // Días en los que lo ya confirmado pide más material del que hay (de hoy en adelante)
+  const faltasProximas = disponible.faltasConfirmadas.filter((f) => f.hasta >= hoy);
 
   const meses = mesesDelPeriodo(periodo, hoy).map((m) => {
     const delMes = tarjetas.filter((t) => estaEnMes(t, m)).sort((a, b) => ordenEnMes(a).localeCompare(ordenEnMes(b)));
@@ -115,6 +123,18 @@ export function Planificacion({ mesDetalle }: { mesDetalle?: string }) {
         <span><Etiqueta className={CLASE_SEGURO}>Seguro</Etiqueta> seguro de lluvia</span>
         <span><Etiqueta className="border border-dashed border-[#BDBBB5] bg-card">Pendiente</Etiqueta> presupuesto sin aceptar</span>
       </div>
+
+      {faltasProximas.length > 0 && (
+        <section aria-label="Falta material" className="mb-4 rounded-xl border border-[#F3C4C1] bg-[#FDF6F5] p-3.5 text-sm">
+          <h2 className="mb-1.5 font-semibold text-[#B0302A]">⚠ Falta material en lo ya confirmado</h2>
+          <ul className="grid gap-1">
+            {faltasProximas.map((f) => (
+              <li key={`${f.recurso}${f.desde}`}>{textoFalta(f)} {rango(f)} <span className="text-muted-foreground">· {f.nombres.join(", ")}</span></li>
+            ))}
+          </ul>
+          <p className="mt-1.5 text-xs text-muted-foreground">Alquila a otra empresa o plantéate comprar más. Solo cuenta carpas, tarima y sombrillas.</p>
+        </section>
+      )}
 
       {sinFecha.length > 0 && (
         <section aria-label="Eventos sin fecha" className="mb-4 rounded-xl border border-dashed bg-card p-3.5">
@@ -189,6 +209,11 @@ function TarjetaEvento({ t, mes }: { t: Tarjeta; mes: MesPeriodo }) {
         </Etiqueta>
       </div>
       <div className="mt-0.5 truncate text-muted-foreground">{[t.tipo, t.material].filter(Boolean).join(" · ")}</div>
+      {t.avisos?.map((a) => (
+        <div key={a} className={cn("mt-1 rounded px-1.5 py-0.5 text-[11px] font-medium", pendiente ? "bg-[#FDF3E1] text-[#8A5A0B]" : "bg-[#FDECEC] text-[#B0302A]")}>
+          ⚠ {pendiente ? "Si se acepta: " : ""}{a}
+        </div>
+      ))}
       <div className="mt-0.5 flex justify-between gap-2 text-muted-foreground">
         <span className="truncate">{t.lugar}</span>
         {t.cobro && <span className={cn("shrink-0", t.cobro.completo && "text-[#25683D]")}>{t.cobro.completo ? "● " : "○ "}{t.cobro.texto}</span>}

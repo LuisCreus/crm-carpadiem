@@ -12,6 +12,10 @@ import { moverAPapelera } from "@/lib/datos/papelera";
 import { formatoFecha, hoyMadrid } from "@/lib/formato";
 import { controlMaterial, type EstadoMaterial, type Solape } from "@/lib/operativa";
 import { useUnaVez } from "@/hooks/use-una-vez";
+import { useKit } from "@/hooks/use-kit";
+import { cantidadesDe, piezasParaMontar, textoCantidades, type Cantidades, type FilaCantidades } from "@/lib/material";
+import { useTablaEnVivo } from "@/hooks/use-tabla-en-vivo";
+import { uno } from "@/lib/datos/tipos";
 
 export type MovimientoMaterial = { id: string; material: string; cantidad: number; sentido: "sale" | "entra"; fecha: string | null; notas: string | null };
 export type ReservaMaterial = { id: string; inventario_id: string; cantidad: number };
@@ -182,6 +186,37 @@ export function TarjetaControlMaterial({ eventoId, movimientos, inventario }: {
           </ul>
         </details>
       )}
+    </section>
+  );
+}
+
+// Material a cargar: el kit de cada carpa (Inventario) por las carpas del presupuesto.
+// Es lo mismo que sale en la hoja de montaje.
+export function TarjetaMaterialCargar({ eventoId }: { eventoId: string }) {
+  const kit = useKit();
+  const { datos } = useTablaEnVivo<Cantidades>(["eventos", "presupuestos"], async (sb) => {
+    const { data, error } = await sb.from("eventos")
+      .select("material, presupuesto:presupuestos(uds_beduinas, uds_modulares, m2_tarima, uds_sombrillas, material)").eq("id", eventoId).maybeSingle();
+    if (error) throw new Error(error.message);
+    return data ? [cantidadesDe(uno(data.presupuesto) as FilaCantidades | null, data.material)] : [];
+  });
+  const cantidades = datos[0];
+  if (!cantidades) return null;
+  const piezas = piezasParaMontar(cantidades, kit);
+  return (
+    <section className="rounded-xl border bg-card p-4 md:p-5">
+      <h2 className="text-[15px] font-semibold">Material a cargar</h2>
+      <p className="mb-3 text-[13px] text-muted-foreground">{textoCantidades(cantidades)} · sale también en la hoja de montaje. Se cambia en el presupuesto y en Inventario.</p>
+      {piezas.length === 0 && <p className="text-sm text-muted-foreground">Sin carpas, tarima ni sombrillas.</p>}
+      <ul className="grid gap-0.5 text-[13px] sm:grid-cols-2">
+        {piezas.map((p) => (
+          <li key={p.material} className="flex gap-2">
+            <span className="w-9 text-right font-medium tabular-nums">{p.cantidad}</span>
+            <span className="flex-1">{p.material}</span>
+            {p.falta > 0 && <span className="text-[#B0302A]">faltan {p.falta}</span>}
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

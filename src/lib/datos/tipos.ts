@@ -51,6 +51,11 @@ export type Presupuesto = PresupuestoLista & {
   sp_carpeta_ruta: string | null;
   intermediario: { id: string; nombre: string } | null;
   cliente: { id: string; nombre: string; tipo_cliente: string | null } | null;
+  // Material a grosso modo (para avisar si falta)
+  uds_beduinas: number;
+  uds_modulares: number;
+  m2_tarima: number;
+  uds_sombrillas: number;
 };
 
 export const SELECT_PRESUPUESTO =

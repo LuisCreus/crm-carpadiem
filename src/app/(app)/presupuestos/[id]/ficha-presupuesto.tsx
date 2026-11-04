@@ -25,6 +25,9 @@ import {
 import { DialogoAceptar, DialogoCobro, DialogoContacto, DialogoDatos, DialogoRechazar } from "./dialogos";
 import { TarjetaDocumento } from "./tarjeta-documento";
 import { cn } from "@/lib/utils";
+import { cantidadesDePresupuesto } from "@/components/campos-material";
+import { useDisponibilidad } from "@/hooks/use-disponibilidad";
+import { textoCantidades } from "@/lib/material";
 
 type Datos = {
   p: Presupuesto;
@@ -64,6 +67,7 @@ const telefonoWhatsapp = (tel: string) => {
 export function FichaPresupuesto({ id }: { id: string }) {
   const router = useRouter();
   const listas = useListas();
+  const disponible = useDisponibilidad();
   const [dialogo, setDialogo] = useState<null | "aceptar" | "rechazar" | "cobro" | "datos" | "contacto">(null);
   const cerrar = () => setDialogo(null);
 
@@ -241,7 +245,15 @@ export function FichaPresupuesto({ id }: { id: string }) {
               <Dato etiqueta="Plantilla">{p.plantilla === "neutra" ? "Neutra" : "Carpa Diem"}</Dato>
             </div>
             <div className="mt-4 border-t pt-4">
-              <Dato etiqueta="Material">{p.material}</Dato>
+              <Dato etiqueta="Material">
+                {p.material}
+                <span className="block text-xs text-muted-foreground">{textoCantidades(cantidadesDePresupuesto(p))}</span>
+                {(disponible.avisos.get(p.id) ?? []).map((x) => (
+                  <span key={x} className="mt-1 block rounded bg-[#FDF3E1] px-2 py-1 text-xs text-[#8A5A0B]">
+                    ⚠ {["borrador", "pendiente"].includes(p.estado) ? "Si se acepta: " : ""}{x}
+                  </span>
+                ))}
+              </Dato>
             </div>
           </Tarjeta>
 
