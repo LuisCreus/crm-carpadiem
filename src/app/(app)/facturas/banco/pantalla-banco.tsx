@@ -23,6 +23,7 @@ import { crearClienteNavegador } from "@/lib/supabase/client";
 import { leerTodo } from "@/lib/supabase/leer-todo";
 import { cn } from "@/lib/utils";
 import { PestanasFacturas } from "../pestanas";
+import { useSoloLectura } from "@/components/usuario";
 
 type MovimientoBanco = {
   id: string; fecha: string; concepto: string; importe: number; saldo: number | null;
@@ -35,6 +36,7 @@ const FILTROS = [["pendiente", "Por revisar"], ["conciliado", "Conciliados"], ["
 // Banco: se sube el extracto del Santander y cada movimiento se enlaza con su factura
 // (cobro de una emitida o pago de una recibida), se apunta como gasto o se ignora.
 export function PantallaBanco() {
+  const soloLectura = useSoloLectura();
   const listas = useListas();
   const [filtro, setFiltro] = useState<(typeof FILTROS)[number][0]>("pendiente");
   const [subiendo, setSubiendo] = useState(false);
@@ -152,9 +154,9 @@ export function PantallaBanco() {
       <Cabecera titulo="Facturas" subtitulo="Los movimientos del banco, enlazados con sus facturas">
         <input ref={ficheroRef} type="file" className="hidden" accept=".n43,.q43,.aeb,.txt,.csv,.xlsx,.xls"
           onChange={(e) => void subir(e.target.files?.[0])} />
-        <Button disabled={subiendo} onClick={() => ficheroRef.current?.click()}>
+        {!soloLectura && (<Button disabled={subiendo} onClick={() => ficheroRef.current?.click()}>
           <Upload className="size-4" aria-hidden /> {subiendo ? "Leyendo…" : "Subir extracto"}
-        </Button>
+        </Button>)}
       </Cabecera>
       <PestanasFacturas activa="banco" />
 
@@ -207,7 +209,7 @@ export function PantallaBanco() {
                   {m.importe > 0 ? "+" : ""}{formatoEuros(m.importe)}
                 </div>
 
-                {m.estado === "pendiente" ? (
+                {soloLectura ? null : m.estado === "pendiente" ? (
                   <div className="flex w-full flex-wrap items-center justify-end gap-2 md:w-auto">
                     {p?.tipo === "cobro" && (
                       <Propuesto seguro={p.seguro} texto={`Cobro ${p.factura.codigo} · ${p.factura.cliente ?? ""}`} confirmar={() => conciliarCobro(m, p.factura)} />

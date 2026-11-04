@@ -13,6 +13,7 @@ import { eventosCercanos, porRevisar, type EventoRevision } from "@/lib/empareja
 import { formatoEuros, formatoFecha, hoyMadrid } from "@/lib/formato";
 import { crearClienteNavegador } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { useSoloLectura } from "@/components/usuario";
 
 type Gasto = { id: string; evento_id: string | null; categoria: string | null; fecha: string; base: number; numero: string | null; proveedor: string | null };
 type Factura = { id: string; evento_id: string | null; estado: string; fecha_emision: string | null; codigo: string | null; importe: number; fact_nombre: string | null };
@@ -20,6 +21,7 @@ type Datos = { eventos: EventoRevision[]; gastos: Gasto[]; facturas: Factura[] }
 
 // «Revisar emparejamiento»: lo que parece mal asignado, con botones para arreglarlo en un clic
 export function RevisarEmparejamiento() {
+  const soloLectura = useSoloLectura();
   const listas = useListas();
   const hoy = hoyMadrid();
   const [abierto, setAbierto] = useState(false);
@@ -40,7 +42,7 @@ export function RevisarEmparejamiento() {
   const d = datos[0];
   const deEvento = useMemo(() => new Set(listas.categoriasGasto.filter((c) => c.tipo === "variable").map((c) => c.codigo)), [listas.categoriasGasto]);
   const r = useMemo(() => d && porRevisar(hoy, d.eventos, d.gastos, d.facturas, deEvento), [d, hoy, deEvento]);
-  if (!d || !r) return null;
+  if (!d || !r || soloLectura) return null;
   const total = r.gastosSinEvento.length + r.facturasSinEvento.length + r.eventosSinMontaje.length;
 
   async function asignar(tabla: "facturas" | "facturas_recibidas", id: string, eventoId: string) {

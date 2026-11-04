@@ -19,7 +19,7 @@ import { ESTADOS_FACTURA, TIPOS_FACTURA, conceptoAlEmitir, textoCorreoFactura, t
 import { formatoEuros, formatoFecha, hoyMadrid, leerEuros } from "@/lib/formato";
 import { generarPdfFactura } from "@/lib/facturas-pdf";
 import { estadoCorreo, prepararCorreoFactura } from "@/lib/correo-facturas";
-import { useEsAdmin } from "@/components/usuario";
+import { useEsAdmin, useSoloLectura } from "@/components/usuario";
 
 // Emitida y todavía sin enviar al cliente
 export const porEnviar = (f: Pick<Factura, "estado" | "correo_preparado_at">) => f.estado === "emitida" && !f.correo_preparado_at;
@@ -178,6 +178,7 @@ export function DialogoFactura({ cerrar, factura, eventoId, clienteId, inicial }
 // Botones de una factura según su estado: Emitir · Marcar pagada · Deshacer pago · Editar · Quitar
 export function AccionesFactura({ f, datos, editar }: { f: Factura; datos: DatosFacturacion; editar?: () => void }) {
   const esAdmin = useEsAdmin();
+  const soloLectura = useSoloLectura();
   const [dialogo, setDialogo] = useState<"emitir" | "pagar" | "datos" | "correo" | null>(null);
   const [fechaPago, setFechaPago] = useState(hoyMadrid());
   const faltanDatos = !datos.fact_nombre || !datos.fact_nif;
@@ -305,6 +306,15 @@ export function AccionesFactura({ f, datos, editar }: { f: Factura; datos: Datos
     }
   }
 
+  // Socios: solo descargar y compartir el PDF
+  if (soloLectura) {
+    return f.estado !== "prevista" && f.pdf_item_id ? (
+      <span className="flex items-center gap-1.5">
+        <Button size="icon-sm" variant="ghost" aria-label={`Descargar PDF de ${f.codigo}`} render={<a href={`/api/factura/${f.id}`} />}><Download className="size-3.5" aria-hidden /></Button>
+        <Button size="icon-sm" variant="ghost" aria-label={`Compartir PDF de ${f.codigo}`} onClick={compartir}><Share2 className="size-3.5" aria-hidden /></Button>
+      </span>
+    ) : null;
+  }
   return (
     <span className="flex flex-wrap items-center gap-1.5">
       {f.estado === "prevista" && (
@@ -329,7 +339,7 @@ export function AccionesFactura({ f, datos, editar }: { f: Factura; datos: Datos
               </Button>}
               <Button size="sm" variant="ghost" onClick={marcarEnviada}>Ya enviada</Button>
             </>
-          ) : (
+          ) : esAdmin && (
             <Button size="icon-sm" variant="ghost" aria-label={`Volver a enviar ${f.codigo} por correo`} title="Volver a enviar por correo" onClick={() => setDialogo("correo")}>
               <Mail className="size-3.5" aria-hidden />
             </Button>

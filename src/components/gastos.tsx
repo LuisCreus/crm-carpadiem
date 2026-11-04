@@ -24,6 +24,7 @@ import { totalRecibida } from "@/lib/gastos";
 import { formatoIban, type DatosLeidos } from "@/lib/leer-factura";
 import { eventosCercanos } from "@/lib/emparejamiento";
 import { useUnaVez } from "@/hooks/use-una-vez";
+import { useSoloLectura } from "@/components/usuario";
 
 type EventoOpcion = { id: string; texto: string; fecha_inicio: string | null; estado: string };
 
@@ -307,6 +308,7 @@ function Copiar({ texto, etiqueta }: { texto: string; etiqueta: string }) {
 export function LineaGasto({ g, mostrarEvento = true, seleccion }: {
   g: FacturaRecibida; mostrarEvento?: boolean; seleccion?: { marcada: boolean; cambiar: () => void };
 }) {
+  const soloLectura = useSoloLectura();
   const { enCurso, unaVez } = useUnaVez();
   const listas = useListas();
   const hoy = hoyMadrid();
@@ -372,11 +374,11 @@ export function LineaGasto({ g, mostrarEvento = true, seleccion }: {
             <Paperclip className="size-3.5" aria-hidden />
           </Button>
         )}
-        {g.estado === "pendiente"
+        {!soloLectura && (g.estado === "pendiente"
           ? <Button size="sm" variant="outline" onClick={() => setDialogo("pagar")}>Marcar pagada</Button>
-          : <Button size="sm" variant="ghost" onClick={deshacerPago}>Deshacer pago</Button>}
-        <Button size="sm" variant="ghost" onClick={() => setDialogo("editar")}>Editar</Button>
-        <Button size="sm" variant="ghost" onClick={quitar}>Quitar</Button>
+          : <Button size="sm" variant="ghost" onClick={deshacerPago}>Deshacer pago</Button>)}
+        {!soloLectura && <Button size="sm" variant="ghost" onClick={() => setDialogo("editar")}>Editar</Button>}
+        {!soloLectura && <Button size="sm" variant="ghost" onClick={quitar}>Quitar</Button>}
       </span>
 
       {dialogo === "editar" && <DialogoGasto gasto={g} cerrar={() => setDialogo(null)} />}

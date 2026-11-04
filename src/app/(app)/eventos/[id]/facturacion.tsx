@@ -11,9 +11,11 @@ import { SELECT_FACTURA, aFactura, type Evento, type Factura } from "@/lib/datos
 import { conceptoMensualidad, resumenFacturacion } from "@/lib/facturacion";
 import { formatoEuros, hoyMadrid } from "@/lib/formato";
 import { cuotaDelMes, nombreMes } from "@/lib/cuotas";
+import { useSoloLectura } from "@/components/usuario";
 
 // Tarjeta "Facturación" de la ficha del evento: qué se ha facturado y qué falta
 export function TarjetaFacturacion({ e, cobrado }: { e: Evento; cobrado: number }) {
+  const soloLectura = useSoloLectura();
   const [dialogo, setDialogo] = useState<"datos" | "nueva" | "mensualidad" | Factura | null>(null);
   const { datos: facturas } = useTablaEnVivo<Factura>(["facturas"], async (sb) => {
     const { data, error } = await sb.from("facturas").select(SELECT_FACTURA).eq("evento_id", e.id).is("deleted_at", null)
@@ -30,14 +32,14 @@ export function TarjetaFacturacion({ e, cobrado }: { e: Evento; cobrado: number 
     <section className="rounded-xl border bg-card p-5">
       <div className="mb-3.5 flex items-center gap-2">
         <h2 className="flex-1 text-[15px] font-semibold">Facturación</h2>
-        {e.es_larga_duracion && (
+        {e.es_larga_duracion && !soloLectura && (
           <Button size="sm" variant="outline" onClick={() => setDialogo("mensualidad")}>
             <Plus className="size-4" aria-hidden /> Mensualidad
           </Button>
         )}
-        <Button size="sm" variant="outline" onClick={() => setDialogo("nueva")}>
+        {!soloLectura && <Button size="sm" variant="outline" onClick={() => setDialogo("nueva")}>
           <Plus className="size-4" aria-hidden /> Factura
-        </Button>
+        </Button>}
       </div>
 
       {!e.es_larga_duracion && (
@@ -69,7 +71,7 @@ export function TarjetaFacturacion({ e, cobrado }: { e: Evento; cobrado: number 
           <div className="mb-0.5 text-xs text-muted-foreground">{datos.deOtro ? "Se factura a (solo este evento)" : "Se factura al cliente"}</div>
           <TextoDatosFacturacion d={datos} />
         </div>
-        <Button size="sm" variant="ghost" onClick={() => setDialogo("datos")}>Cambiar</Button>
+        {!soloLectura && <Button size="sm" variant="ghost" onClick={() => setDialogo("datos")}>Cambiar</Button>}
       </div>
 
       {facturas.length === 0 ? (

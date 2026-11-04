@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { cantidadesDePresupuesto } from "@/components/campos-material";
 import { useDisponibilidad } from "@/hooks/use-disponibilidad";
 import { textoCantidades } from "@/lib/material";
+import { useSoloLectura } from "@/components/usuario";
 
 type Datos = {
   p: Presupuesto;
@@ -65,6 +66,7 @@ const telefonoWhatsapp = (tel: string) => {
 };
 
 export function FichaPresupuesto({ id }: { id: string }) {
+  const soloLectura = useSoloLectura();
   const router = useRouter();
   const listas = useListas();
   const disponible = useDisponibilidad();
@@ -174,7 +176,7 @@ export function FichaPresupuesto({ id }: { id: string }) {
   const principal =
     p.estado === "borrador" ? <Button onClick={marcarEnviado}>Marcar como enviado</Button>
     : p.estado === "pendiente" || p.estado === "caducado" ? <Button onClick={() => setDialogo("aceptar")}>Aceptar</Button>
-    : aceptado ? <Button onClick={() => setDialogo("cobro")}>+ Apuntar cobro</Button>
+    : aceptado && !soloLectura ? <Button onClick={() => setDialogo("cobro")}>+ Apuntar cobro</Button>
     : null;
 
   return (
@@ -299,13 +301,13 @@ export function FichaPresupuesto({ id }: { id: string }) {
                     <span className="w-24 text-muted-foreground">{formatoFecha(c.fecha)}</span>
                     <span className="flex-1">{CONCEPTOS_COBRO[c.concepto]}{c.notas && <span className="text-muted-foreground"> · {c.notas}</span>}</span>
                     <span className="font-medium">{formatoEuros(c.importe)}</span>
-                    <Button variant="ghost" size="icon-sm" aria-label="Borrar cobro" onClick={() => borrarCobro(c)}><Trash2 className="size-3.5" aria-hidden /></Button>
+                    {!soloLectura && <Button variant="ghost" size="icon-sm" aria-label="Borrar cobro" onClick={() => borrarCobro(c)}><Trash2 className="size-3.5" aria-hidden /></Button>}
                   </li>
                 ))}
               </ul>
             )}
             {aceptado ? (
-              <Button variant="outline" className="mt-4 w-full" onClick={() => setDialogo("cobro")}>+ Apuntar cobro</Button>
+              !soloLectura && <Button variant="outline" className="mt-4 w-full" onClick={() => setDialogo("cobro")}>+ Apuntar cobro</Button>
             ) : (
               <p className="mt-4 text-[13px] text-muted-foreground">Los cobros se apuntan cuando el presupuesto está aceptado.</p>
             )}

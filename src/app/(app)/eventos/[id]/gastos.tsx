@@ -8,9 +8,11 @@ import { useTablaEnVivo } from "@/hooks/use-tabla-en-vivo";
 import { SELECT_FACTURA_RECIBIDA, aFacturaRecibida, type FacturaRecibida } from "@/lib/datos/tipos";
 import { gastosEvento } from "@/lib/gastos";
 import { formatoEuros } from "@/lib/formato";
+import { useSoloLectura } from "@/components/usuario";
 
 // Gastos del evento: facturas de montadores, furgoneta, gasolina, alquiler de carpas…
 export function TarjetaGastos({ eventoId }: { eventoId: string }) {
+  const soloLectura = useSoloLectura();
   const [nuevo, setNuevo] = useState(false);
   const { datos: gastos } = useTablaEnVivo<FacturaRecibida>(["facturas_recibidas", "proveedores"], async (sb) => {
     const { data, error } = await sb.from("facturas_recibidas").select(SELECT_FACTURA_RECIBIDA)
@@ -23,7 +25,7 @@ export function TarjetaGastos({ eventoId }: { eventoId: string }) {
     <section className="rounded-xl border bg-card p-5">
       <div className="mb-3.5 flex items-center gap-2">
         <h2 className="flex-1 text-[15px] font-semibold">Gastos</h2>
-        <Button size="sm" variant="outline" onClick={() => setNuevo(true)}><Plus className="size-4" aria-hidden /> Gasto</Button>
+        {!soloLectura && <Button size="sm" variant="outline" onClick={() => setNuevo(true)}><Plus className="size-4" aria-hidden /> Gasto</Button>}
       </div>
       {gastos.length === 0 ? (
         <p className="text-sm text-muted-foreground">Sin gastos todavía. Apunta aquí las facturas de montadores, furgoneta, gasolina…</p>

@@ -26,7 +26,7 @@ function Enlace({ item, pathname }: { item: ItemNav; pathname: string }) {
   );
 }
 
-export function MenuLateral({ nombre, esAdmin }: { nombre: string; esAdmin: boolean }) {
+export function MenuLateral({ nombre, esAdmin, esSocio }: { nombre: string; esAdmin: boolean; esSocio: boolean }) {
   const pathname = usePathname();
   const iniciales = nombre.split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
 
@@ -44,7 +44,7 @@ export function MenuLateral({ nombre, esAdmin }: { nombre: string; esAdmin: bool
         <span className="flex-1 text-left">Buscar</span>
         <kbd className="rounded border px-1 text-[11px]">Ctrl K</kbd>
       </button>
-      {NAV_PRINCIPAL.filter((i) => !i.soloAdmin || esAdmin).map((item) => <Enlace key={item.href} item={item} pathname={pathname} />)}
+      {NAV_PRINCIPAL.filter((i) => !i.soloAdmin || esAdmin || (i.socios && esSocio)).map((item) => <Enlace key={item.href} item={item} pathname={pathname} />)}
       <div className="grow" />
       {NAV_SECUNDARIA.filter((i) => !i.soloAdmin || esAdmin).map((item) => (
         <Enlace key={item.href} item={item} pathname={pathname} />
@@ -55,7 +55,7 @@ export function MenuLateral({ nombre, esAdmin }: { nombre: string; esAdmin: bool
         </div>
         <div className="min-w-0 flex-1 text-[13px] leading-tight">
           <div className="truncate">{nombre}</div>
-          <div className="text-xs text-muted-foreground">{esAdmin ? "Administrador" : "Usuario"}</div>
+          <div className="text-xs text-muted-foreground">{esAdmin ? "Administrador" : esSocio ? "Socio" : "Usuario"}</div>
         </div>
         <form action="/auth/salir" method="post">
           <button type="submit" aria-label="Cerrar sesión" className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground">

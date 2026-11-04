@@ -1,10 +1,10 @@
-import { exigirAdmin } from "@/lib/auth";
+import { exigirFinanzas } from "@/lib/auth";
 import type { Metadata } from "next";
 import { ResumenRentabilidad } from "./resumen-rentabilidad";
 
 export const metadata: Metadata = { title: "Rentabilidad" };
 
 export default async function RentabilidadPage() {
-  await exigirAdmin();
+  await exigirFinanzas();
   return <ResumenRentabilidad />;
 }

@@ -3,7 +3,7 @@ import {
 } from "lucide-react";
 
 // "tambien": otras pantallas que cuentan como esta opción del menú (p. ej. las pestañas de Contactos)
-export type ItemNav = { href: string; titulo: string; icono: LucideIcon; soloAdmin?: boolean; tambien?: string[] };
+export type ItemNav = { href: string; titulo: string; icono: LucideIcon; soloAdmin?: boolean; socios?: boolean; tambien?: string[] };
 
 export const NAV_PRINCIPAL: ItemNav[] = [
   { href: "/", titulo: "Inicio", icono: Home },
@@ -12,7 +12,7 @@ export const NAV_PRINCIPAL: ItemNav[] = [
   { href: "/eventos", titulo: "Eventos", icono: Tent },
   { href: "/planificacion", titulo: "Planificación", icono: CalendarDays },
   { href: "/facturas", titulo: "Facturas", icono: Receipt },
-  { href: "/finanzas", titulo: "Finanzas", icono: TrendingUp, soloAdmin: true },
+  { href: "/finanzas", titulo: "Finanzas", icono: TrendingUp, soloAdmin: true, socios: true },
   { href: "/proveedores", titulo: "Contactos", icono: Users, tambien: ["/intermediarios"] },
   { href: "/inventario", titulo: "Inventario", icono: Boxes },
 ];

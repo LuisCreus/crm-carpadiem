@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEsAdmin } from "@/components/usuario";
+import { useVeFinanzas } from "@/components/usuario";
 import { cn } from "@/lib/utils";
 
 const PESTANAS = [
@@ -13,9 +13,9 @@ const PESTANAS = [
 
 // Emitidas (a clientes) · Recibidas (de proveedores) · Gestoría (por trimestre) · Banco (conciliar)
 export function PestanasFacturas({ activa }: { activa: (typeof PESTANAS)[number][0] }) {
-  const esAdmin = useEsAdmin();
-  // Gestoría y Banco, solo el administrador
-  const visibles = PESTANAS.filter(([clave]) => esAdmin || (clave !== "gestoria" && clave !== "banco"));
+  const veFinanzas = useVeFinanzas();
+  // Gestoría y Banco: el administrador (y los socios, para ver)
+  const visibles = PESTANAS.filter(([clave]) => veFinanzas || (clave !== "gestoria" && clave !== "banco"));
   return (
     <nav aria-label="Facturas" className="mb-5 inline-flex max-w-full overflow-x-auto rounded-lg border text-sm">
       {visibles.map(([clave, href, texto]) => (

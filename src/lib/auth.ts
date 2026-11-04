@@ -8,6 +8,7 @@ export type Usuario = {
   email: string;
   nombre: string;
   esAdmin: boolean;
+  esSocio: boolean; // ve facturas y finanzas, pero no las cambia
 };
 
 // Usuario de la sesión actual, con su perfil. Si no hay sesión o el perfil
@@ -20,7 +21,7 @@ export const obtenerUsuario = cache(async (): Promise<Usuario> => {
 
   const { data: perfil } = await supabase
     .from("perfiles")
-    .select("id, email, nombre, rol, activo")
+    .select("id, email, nombre, rol, activo, es_socio")
     .eq("id", userId)
     .maybeSingle();
 
@@ -33,11 +34,19 @@ export const obtenerUsuario = cache(async (): Promise<Usuario> => {
     email: perfil.email,
     nombre: perfil.nombre || metadatos.full_name || metadatos.name || perfil.email.split("@")[0],
     esAdmin: perfil.rol === "admin",
+    esSocio: Boolean(perfil.es_socio),
   };
 });
 
 export async function exigirAdmin(): Promise<Usuario> {
   const usuario = await obtenerUsuario();
   if (!usuario.esAdmin) redirect("/");
+  return usuario;
+}
+
+// Finanzas, Banco y Gestoría: el administrador y los socios (estos, solo para ver)
+export async function exigirFinanzas(): Promise<Usuario> {
+  const usuario = await obtenerUsuario();
+  if (!usuario.esAdmin && !usuario.esSocio) redirect("/");
   return usuario;
 }

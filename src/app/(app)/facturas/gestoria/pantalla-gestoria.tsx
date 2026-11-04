@@ -12,6 +12,7 @@ import { formatoEuros, formatoFecha, hoyMadrid } from "@/lib/formato";
 import { pasarTrimestre, verTrimestre, type FilaGestoria, type Trimestre, type Ubicacion } from "@/lib/gestoria";
 import { trimestreDe } from "@/lib/rentabilidad";
 import { PestanasFacturas } from "../pestanas";
+import { useSoloLectura } from "@/components/usuario";
 
 const UBICACION: Record<Ubicacion, string> = {
   pendiente: "En PENDIENTE SARA",
@@ -47,6 +48,7 @@ function Lista({ titulo, filas }: { titulo: string; filas: FilaGestoria[] }) {
 
 // Gestoría: facturas de cada trimestre (emitidas y recibidas) y el botón "Pasar a la gestoría"
 export function PantallaGestoria() {
+  const soloLectura = useSoloLectura();
   const hoy = hoyMadrid();
   const [anio, setAnio] = useState(Number(hoy.slice(0, 4)));
   const [t, setT] = useState(trimestreDe(hoy));
@@ -109,7 +111,7 @@ export function PantallaGestoria() {
                 ? <><b>{porPasar.length}</b> {porPasar.length === 1 ? "factura por pasar" : "facturas por pasar"} · {aMover.length} PDF en PENDIENTE SARA</>
                 : "Todo este trimestre está pasado a la gestoría."}
             </div>
-            <Button disabled={pasando} onClick={() => setConfirmar(true)}>{porPasar.length ? "Pasar a la gestoría" : "Volver a hacer el Excel"}</Button>
+            {!soloLectura && <Button disabled={pasando} onClick={() => setConfirmar(true)}>{porPasar.length ? "Pasar a la gestoría" : "Volver a hacer el Excel"}</Button>}
           </div>
 
           <Lista titulo="Emitidas" filas={datos.filas.filter((f) => f.tipo === "emitida")} />
