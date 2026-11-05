@@ -15,7 +15,7 @@ import type { PrecisionFecha } from "@/lib/negocio";
 import { cn } from "@/lib/utils";
 import { useUnaVez } from "@/hooks/use-una-vez";
 import { CamposMaterial, cantidadesDePresupuesto, columnasMaterial } from "@/components/campos-material";
-import type { Cantidades } from "@/lib/material";
+import { completarTexto, type Cantidades } from "@/lib/material";
 
 type Abierto = { abierto: boolean; cerrar: () => void };
 
@@ -197,7 +197,7 @@ export function DialogoDatos({ abierto, cerrar, presupuesto }: Abierto & { presu
       fecha_fin: precision === "dia" && fechaFin ? fechaFin : null,
       ubicacion: campos.ubicacion.trim() || null,
       provincia: campos.provincia.trim() || null,
-      material: campos.material.trim() || null,
+      material: completarTexto(campos.material, cantidades).trim() || null,
       ...columnasMaterial(cantidades),
       comercial_id: campos.comercial_id || null,
       intermediario_id: campos.intermediario_id || null,

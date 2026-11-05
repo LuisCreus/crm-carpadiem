@@ -34,3 +34,12 @@ describe("material a grosso modo", () => {
     expect(piezasParaMontar({ beduinas: 3, modulares: 0, tarima_m2: 0, sombrillas: 0 }, kit)[0].cantidad).toBe(23);
   });
 });
+
+describe("texto del material al día con las casillas", () => {
+  it("añade lo que falta y deja igual lo que ya cuadra", async () => {
+    const { completarTexto } = await import("../material");
+    expect(completarTexto("1 carpa beduina 12x15", { beduinas: 1, modulares: 0, tarima_m2: 64, sombrillas: 0 })).toBe("1 carpa beduina 12x15 + tarima 64 m²");
+    expect(completarTexto("1 carpa beduina 12x15 + tarima de baile 64 m²", { beduinas: 1, modulares: 0, tarima_m2: 64, sombrillas: 0 })).toBe("1 carpa beduina 12x15 + tarima de baile 64 m²");
+    expect(completarTexto("", { beduinas: 2, modulares: 0, tarima_m2: 0, sombrillas: 1 })).toBe("2 carpas beduinas + 1 sombrilla");
+  });
+});

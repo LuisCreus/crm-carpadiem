@@ -77,3 +77,16 @@ export function piezasParaMontar(c: Cantidades, kit: PiezaKit[]): { material: st
       return { material: p.material, grupo: p.grupo, cantidad: necesita, falta: Math.max(0, necesita - p.stock) };
     });
 }
+
+// Si las casillas dicen más de lo que pone el texto (p. ej. se añadió una tarima solo en la casilla),
+// se añade al texto para que presupuesto, evento y planificación digan lo mismo.
+export function completarTexto(texto: string, c: Cantidades): string {
+  const leido = leerMaterial(texto);
+  const extra: string[] = [];
+  const n = (k: Recurso) => Math.round((c[k] - leido[k]) * 100) / 100;
+  if (n("beduinas") > 0) extra.push(`${n("beduinas")} ${n("beduinas") === 1 ? "carpa beduina" : "carpas beduinas"}`);
+  if (n("modulares") > 0) extra.push(`${n("modulares")} ${n("modulares") === 1 ? "carpa modular" : "carpas modulares"}`);
+  if (n("tarima_m2") > 0) extra.push(`tarima ${String(n("tarima_m2")).replace(".", ",")} m²`);
+  if (n("sombrillas") > 0) extra.push(`${n("sombrillas")} ${n("sombrillas") === 1 ? "sombrilla" : "sombrillas"}`);
+  return extra.length ? [texto.trim(), ...extra].filter(Boolean).join(" + ") : texto;
+}

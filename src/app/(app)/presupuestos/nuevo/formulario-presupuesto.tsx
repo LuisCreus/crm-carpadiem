@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { CamposMaterial, columnasMaterial } from "@/components/campos-material";
-import { SIN_MATERIAL, type Cantidades } from "@/lib/material";
+import { completarTexto, SIN_MATERIAL, type Cantidades } from "@/lib/material";
 import { useListas } from "@/hooks/use-listas";
 import { crearClienteNavegador } from "@/lib/supabase/client";
 import { uno } from "@/lib/datos/tipos";
@@ -164,7 +164,7 @@ export function FormularioPresupuesto({ nombreUsuario, leadId, duplicarId, opcio
         fecha_fin: precision === "dia" ? fechaFin : "",
         ubicacion,
         provincia,
-        material,
+        material: completarTexto(material, cantidades),
         comercial_id: comercialMostrado,
         reserva_pct: reservaMostrada,
         plantilla,
