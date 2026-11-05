@@ -118,8 +118,12 @@ export function DialogoCobro({ abierto, cerrar, presupuestoId, pendiente, reserv
     <Dialog open={abierto} onOpenChange={(a) => !a && cerrar()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Apuntar cobro</DialogTitle>
-          {pendiente !== null && <DialogDescription>Pendiente de cobro: {formatoEuros(pendiente)}</DialogDescription>}
+          <DialogTitle>Cobro sin factura</DialogTitle>
+          <DialogDescription>
+            Solo para lo que el cliente ya ha pagado <b>sin factura</b>. Si se va a facturar (la reserva, el resto), no lo apuntes aquí:
+            emite la factura en Facturas y, cuando pague, márcala como pagada; el cobro se apunta solo.
+            {pendiente !== null && <> Pendiente de cobro: {formatoEuros(pendiente)}.</>}
+          </DialogDescription>
         </DialogHeader>
         <form id="form-cobro" onSubmit={unaVez(guardar)} className="grid gap-4 sm:grid-cols-2">
           <Campo id="cobro-importe" etiqueta="Importe SIN IVA (€)">

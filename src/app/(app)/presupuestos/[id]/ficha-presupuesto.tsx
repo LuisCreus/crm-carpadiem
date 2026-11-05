@@ -176,7 +176,7 @@ export function FichaPresupuesto({ id }: { id: string }) {
   const principal =
     p.estado === "borrador" ? <Button onClick={marcarEnviado}>Marcar como enviado</Button>
     : p.estado === "pendiente" || p.estado === "caducado" ? <Button onClick={() => setDialogo("aceptar")}>Aceptar</Button>
-    : aceptado && !soloLectura ? <Button onClick={() => setDialogo("cobro")}>+ Apuntar cobro</Button>
+    : aceptado && evento ? <Button render={<Link href={`/eventos/${evento.id}`} />}>Ver evento y facturas</Button>
     : null;
 
   return (
@@ -307,7 +307,12 @@ export function FichaPresupuesto({ id }: { id: string }) {
               </ul>
             )}
             {aceptado ? (
-              !soloLectura && <Button variant="outline" className="mt-4 w-full" onClick={() => setDialogo("cobro")}>+ Apuntar cobro</Button>
+              !soloLectura && (
+                <div className="mt-4 grid gap-1.5">
+                  <p className="text-[12px] text-muted-foreground">Los cobros de las facturas se apuntan solos al marcar la factura como pagada (Facturas → Enviadas sin cobrar).</p>
+                  <Button variant="outline" className="w-full" onClick={() => setDialogo("cobro")}>+ Cobro sin factura</Button>
+                </div>
+              )
             ) : (
               <p className="mt-4 text-[13px] text-muted-foreground">Los cobros se apuntan cuando el presupuesto está aceptado.</p>
             )}
