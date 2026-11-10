@@ -12,6 +12,7 @@ import { useListas } from "@/hooks/use-listas";
 import { useTablaEnVivo } from "@/hooks/use-tabla-en-vivo";
 import { uno } from "@/lib/datos/tipos";
 import { formatoEuros, formatoFecha, hoyMadrid, leerEuros } from "@/lib/formato";
+import { cantidadesDe, type FilaCantidades } from "@/lib/material";
 import { calcularPyg, cuotaActivo, type Activo, type EventoPyg, type Fila, type GastoPyg, type Manual } from "@/lib/pyg";
 import type { FacturaRentabilidad } from "@/lib/rentabilidad";
 import { crearClienteNavegador } from "@/lib/supabase/client";
@@ -28,18 +29,18 @@ const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)} %` : "�
 function usePyg() {
   const { datos, cargando } = useTablaEnVivo<Datos>(["eventos", "presupuestos", "facturas", "facturas_recibidas", "activos", "pyg_manual"], async (sb) => {
     const [e, g, f, a, m] = await Promise.all([
-      sb.from("eventos").select("id, estado, fecha_precision, fecha_inicio, importe, importe_retenido, es_larga_duracion, tipo_evento, presupuesto:presupuestos(comision_pct, intermediario_id)").is("deleted_at", null),
+      sb.from("eventos").select("id, estado, fecha_precision, fecha_inicio, importe, importe_retenido, es_larga_duracion, tipo_evento, material, presupuesto:presupuestos(comision_pct, intermediario_id, uds_beduinas, uds_modulares, m2_tarima, uds_sombrillas, material)").is("deleted_at", null),
       sb.from("facturas_recibidas").select("evento_id, base, fecha, categoria").is("deleted_at", null),
-      sb.from("facturas").select("evento_id, importe, estado, fecha_emision").is("deleted_at", null),
+      sb.from("facturas").select("evento_id, importe, estado, fecha_emision, tipo, descripcion").is("deleted_at", null),
       sb.from("activos").select("id, nombre, coste, vida_anios, fecha_compra, cuota_manual, factura_recibida_id, notas").order("fecha_compra"),
       sb.from("pyg_manual").select("mes, concepto, importe"),
     ]);
     for (const r of [e, g, f, a, m]) if (r.error) throw new Error(r.error.message);
     return [{
       eventos: (e.data ?? []).map((x) => {
-        const p = uno(x.presupuesto) as { comision_pct: number | null; intermediario_id: string | null } | null;
+        const p = uno(x.presupuesto) as ({ comision_pct: number | null; intermediario_id: string | null } & FilaCantidades) | null;
         return {
-          id: x.id, cliente: "", estado: x.estado, fecha_precision: x.fecha_precision, fecha_inicio: x.fecha_inicio, tipo_evento: x.tipo_evento,
+          id: x.id, cliente: "", estado: x.estado, fecha_precision: x.fecha_precision, fecha_inicio: x.fecha_inicio, tipo_evento: x.tipo_evento, material: x.material, cantidades: cantidadesDe(p, x.material),
           importe: x.importe !== null ? Number(x.importe) : null, importe_retenido: x.importe_retenido !== null ? Number(x.importe_retenido) : null,
           es_larga_duracion: x.es_larga_duracion, comision_pct: p?.intermediario_id && p.comision_pct ? Number(p.comision_pct) : null,
         };
@@ -135,7 +136,7 @@ export function PantallaPyg({ esAdmin }: { esAdmin: boolean }) {
               <div key={t} className="rounded-xl border bg-card p-4">
                 <div className="text-xs text-muted-foreground">{t} {anio}</div>
                 <div className={cn("text-xl font-semibold", f.total < 0 && "text-[#B42318]")}>{formatoEuros(Math.round(f.total))}</div>
-                <div className="text-xs text-muted-foreground">{b ? `${pct(f.total, b.total)} de los ingresos` : `${p.porTipo.length} tipos de evento`}</div>
+                <div className="text-xs text-muted-foreground">{b ? `${pct(f.total, b.total)} de los ingresos` : `${p.porTipo.filter((x) => x.total).length} categorías con ventas`}</div>
               </div>
             ))}
           </div>
@@ -145,7 +146,7 @@ export function PantallaPyg({ esAdmin }: { esAdmin: boolean }) {
               detalle={(i) => [["Ingresos", p.ingresos.meses[i]], ["Costes variables", p.variables.meses[i]], ["Costes fijos", p.fijos.meses[i]], ["Personal", p.personal.meses[i]], ["EBITDA", p.ebitda.meses[i]]]} />
             <GraficoBeneficio neto={p.neto.meses} />
             <Ranking titulo="¿En qué se va el dinero?" subtitulo={`${anio} · sin IVA`} color={COLOR.gastos} filas={enQueSeVa} total={enQueSeVa.reduce((s, f) => s + f.total, 0)} />
-            <Ranking titulo="¿De dónde viene?" subtitulo="facturado por tipo de evento" color={COLOR.ingresos} filas={p.porTipo} total={p.ingresos.total} />
+            <Ranking titulo="¿De dónde viene?" subtitulo="facturado por producto" color={COLOR.ingresos} filas={p.porTipo.filter((x) => x.total)} total={p.ingresos.total} />
           </div>
 
           <h2 className="mb-2 text-sm font-semibold">Detalle mes a mes</h2>

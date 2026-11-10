@@ -9,6 +9,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { uno } from "@/lib/datos/tipos";
 import { totalFactura } from "@/lib/facturacion";
 import { leerTodo } from "@/lib/supabase/leer-todo";
+import { cantidadesDe, type FilaCantidades } from "@/lib/material";
 import { calcularPyg, cuotaActivo, type Activo, type Fila, type Manual, type Pyg } from "@/lib/pyg";
 
 type Datos = {
@@ -22,8 +23,8 @@ const todas = (q: () => any) => leerTodo((d, h) => q().range(d, h)) as Promise<a
 
 export async function datosPyg(sb: SupabaseClient, anio: number): Promise<Datos> {
   const [ev, fa, ga, cg, te, ac, pm] = await Promise.all([
-    todas(() => sb.from("eventos").select("id, estado, fecha_precision, fecha_inicio, fecha_fin, importe, importe_retenido, es_larga_duracion, tipo_evento, cliente:clientes(nombre)").is("deleted_at", null).order("id")),
-    todas(() => sb.from("facturas").select("id, evento_id, importe, iva_pct, suplidos, estado, fecha_emision, codigo, tipo, fact_nombre").is("deleted_at", null).order("id")),
+    todas(() => sb.from("eventos").select("id, estado, fecha_precision, fecha_inicio, fecha_fin, importe, importe_retenido, es_larga_duracion, tipo_evento, material, cliente:clientes(nombre), presupuesto:presupuestos(uds_beduinas, uds_modulares, m2_tarima, uds_sombrillas, material)").is("deleted_at", null).order("id")),
+    todas(() => sb.from("facturas").select("id, evento_id, importe, iva_pct, suplidos, estado, fecha_emision, codigo, tipo, descripcion, fact_nombre").is("deleted_at", null).order("id")),
     todas(() => sb.from("facturas_recibidas").select("id, evento_id, base, iva_pct, total, fecha, categoria, numero, estado, proveedor:proveedores(nombre)").is("deleted_at", null).order("id")),
     sb.from("categorias_gasto").select("codigo, nombre, tipo"),
     sb.from("tipos_evento").select("codigo, nombre"),
@@ -35,10 +36,11 @@ export async function datosPyg(sb: SupabaseClient, anio: number): Promise<Datos>
   const tipos = new Map((te.data ?? []).map((t) => [t.codigo as string, t.nombre as string]));
   const activos = (ac.data ?? []).map((a) => ({ ...a, coste: Number(a.coste), cuota_manual: a.cuota_manual === null ? null : Number(a.cuota_manual) })) as (Activo & { notas: string | null })[];
   const eventos = ev.map((e) => ({ ...e, cliente: (uno(e.cliente) as { nombre: string } | null)?.nombre ?? "", comision_pct: null,
+    cantidades: cantidadesDe(uno(e.presupuesto) as FilaCantidades | null, e.material),
     importe: e.importe === null ? null : Number(e.importe), importe_retenido: e.importe_retenido === null ? null : Number(e.importe_retenido) }));
   const pyg = calcularPyg(anio, eventos,
     ga.map((g) => ({ evento_id: g.evento_id, base: Number(g.base), fecha: g.fecha, categoria: g.categoria })),
-    fa.map((f) => ({ evento_id: f.evento_id, importe: Number(f.importe), estado: f.estado, fecha_emision: f.fecha_emision })),
+    fa.map((f) => ({ evento_id: f.evento_id, importe: Number(f.importe), estado: f.estado, fecha_emision: f.fecha_emision, tipo: f.tipo, descripcion: f.descripcion })),
     activos, (pm.data ?? []).map((m) => ({ ...m, importe: Number(m.importe) })) as Manual[], { tiposEvento: tipos, categorias });
 
   const nombreEvento = new Map(eventos.map((e) => [e.id as string, e.cliente as string]));

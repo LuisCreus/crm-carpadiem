@@ -31,7 +31,7 @@ describe("P&L", () => {
 
   it("todo por fecha de factura: ingresos al emitirse (por tipo de evento), gastos en el mes de su factura, el CAPEX fuera", () => {
     const eventos = [
-      evento({ id: "boda", comision_pct: 10 }),
+      evento({ id: "boda", comision_pct: 10, material: "2 carpas beduinas 12x15 + tarima 72 m2" }),
       evento({ id: "pena", tipo_evento: "larga_duracion", es_larga_duracion: true, importe: null, fecha_inicio: "2026-06-01" }),
     ];
     const gastos: GastoPyg[] = [
@@ -50,7 +50,9 @@ describe("P&L", () => {
     const p = calcularPyg(2026, eventos, gastos, facturas, [], [], nombres);
     const [may, ago, sep] = [4, 7, 8];
     expect(p.ingresos.meses[may]).toBe(2400);
-    expect(p.porTipo.map((f) => [f.clave, f.meses[ago]])).toEqual([["boda", 3600], ["larga_duracion", 670], ["otro", 100]]);
+    const ago_ = new Map(p.porTipo.map((f) => [f.clave, f.meses[ago]]));
+    expect(p.porTipo[0].clave).toBe("Carpas beduinas"); // siempre las 13 del Excel, en su orden
+    expect([ago_.get("Carpas beduinas + Tarima"), ago_.get("Alquiler"), ago_.get("Otros"), ago_.get("Sombrillas")]).toEqual([3600, 670, 100, 0]);
     expect(p.porVariable.map((f) => [f.clave, f.meses[sep]])).toEqual([["montadores", 1300]]); // sin comisión prevista
     expect(p.fijos.meses[ago]).toBe(250); // la factura del director va a personal, no a fijos
     expect(p.director.meses[ago]).toBe(1100);
@@ -65,5 +67,24 @@ describe("P&L", () => {
     expect(p.impuesto.meses.slice(0, 3)).toEqual([0, 0, 300]); // (−2000 + 1000 + 3000) × 15 %
     expect(p.impuesto.total).toBe(300);
     expect(p.neto.total).toBe(1700);
+  });
+
+  it("categorías de ingreso como en el Excel", async () => {
+    const { categoriaIngreso } = await import("../pyg");
+    const c = (material: string, x = {}) => categoriaIngreso(evento({ material, ...x }));
+    expect(c("2 carpas beduinas + guirnaldas")).toBe("Carpas beduinas + guirnaldas");
+    expect(c("1 carpa beduina + tarima 64 m2 + guirnaldas + vegetación")).toBe("Carpas beduinas + Tarima + Guirnaldas + Vegetación");
+    expect(c("2 carpas modulares 6x6 + tarima 36 m2")).toBe("Carpas modulares + Tarima");
+    expect(c("1 carpa beduina + 2 carpas modulares + tarima 72 m2")).toBe("Carpas beduinas + Carpas modulares + Tarima");
+    expect(c("4 sombrillas")).toBe("Sombrillas");
+    expect(c("Comisión Gilca")).toBe("Comisión");
+    expect(c("2 beduinas", { estado: "cancelado_reserva_retenida" })).toBe("Reserva");
+    // Cada factura según lo que cobra: la descripción manda sobre el material del evento
+    const boda = evento({ material: "2 carpas tensadas 15x12 + tarima 8x8" });
+    expect(categoriaIngreso(boda, { tipo: "resto", descripcion: "Tarima 64 m2" })).toBe("Tarima");
+    expect(categoriaIngreso(boda, { tipo: "reserva", descripcion: "Reserva 30 %" })).toBe("Reserva");
+    expect(categoriaIngreso(boda, { tipo: "resto", descripcion: "Resto del evento" })).toBe("Carpas beduinas + Tarima");
+    expect(categoriaIngreso(boda, { tipo: "mensualidad" })).toBe("Alquiler");
+    expect(categoriaIngreso(undefined, { tipo: "otra", descripcion: "Comisión boda" })).toBe("Comisión");
   });
 });

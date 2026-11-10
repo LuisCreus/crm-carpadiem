@@ -9,6 +9,7 @@ import { uno } from "@/lib/datos/tipos";
 import { ESTADOS_FACTURA, TIPOS_FACTURA, totalFactura } from "@/lib/facturacion";
 import { generarExcelCopia, copiasQueSobran, fechaMadrid, nombreCopia, type DatosCopia, type Fila } from "@/lib/copias";
 import { leerTodo } from "@/lib/supabase/leer-todo";
+import { cantidadesDe, type FilaCantidades } from "@/lib/material";
 import { calcularPyg, cuotaActivo, lineasPyg, type Activo, type Manual } from "@/lib/pyg";
 import {
   TIPO_XLSX, asegurarCarpeta, eliminarElemento, listarCarpeta, rutaCopias, sharepointConfigurado, subir,
@@ -28,7 +29,7 @@ export async function cargarDatosCopia(sb: SupabaseClient, ahora = new Date()): 
   const [pr, ev, le, co, mv, te, ca, fa, ga, cg, ac, pm, mb] = await Promise.all([
     todas(() => sb.from("presupuestos").select("*, cliente:clientes(nombre), comercial:comerciales(nombre), intermediario:intermediarios(nombre)")
       .is("deleted_at", null).order("anio").order("numero").order("id")),
-    todas(() => sb.from("eventos").select("*, cliente:clientes(nombre), presupuesto:presupuestos(codigo)").is("deleted_at", null).order("fecha_inicio").order("id")),
+    todas(() => sb.from("eventos").select("*, cliente:clientes(nombre), presupuesto:presupuestos(codigo, uds_beduinas, uds_modulares, m2_tarima, uds_sombrillas, material)").is("deleted_at", null).order("fecha_inicio").order("id")),
     todas(() => sb.from("leads").select("*, comercial:comerciales(nombre)").is("deleted_at", null).order("fecha_primer_contacto").order("id")),
     todas(() => sb.from("cobros").select("*, presupuesto:presupuestos(codigo, cliente:clientes(nombre))").is("deleted_at", null).order("fecha").order("id")),
     todas(() => sb.from("material_movimientos").select("*, evento:eventos(cliente:clientes(nombre))").is("deleted_at", null).order("created_at").order("id")),
@@ -113,8 +114,8 @@ export async function cargarDatosCopia(sb: SupabaseClient, ahora = new Date()): 
 function cargarPyg(eventos: Fila[], facturas: Fila[], gastos: Fila[], activos: Activo[], manual: Manual[], tipos: Map<string, string>,
   categorias: { codigo: string; nombre: string; tipo: string }[], ahora: Date): Fila[] {
   const nombres = { tiposEvento: tipos, categorias: new Map(categorias.map((c) => [c.codigo, { nombre: c.nombre, tipo: c.tipo }])) };
-  const ev = eventos.map((e) => ({ ...e, cliente: "", comision_pct: null, importe: e.importe === null ? null : Number(e.importe), importe_retenido: e.importe_retenido === null ? null : Number(e.importe_retenido) })) as Parameters<typeof calcularPyg>[1];
-  const fa = facturas.map((f) => ({ evento_id: f.evento_id as string | null, importe: Number(f.importe), estado: String(f.estado), fecha_emision: f.fecha_emision as string | null }));
+  const ev = eventos.map((e) => ({ ...e, cliente: "", comision_pct: null, cantidades: cantidadesDe(uno(e.presupuesto) as FilaCantidades | null, e.material as string | null), importe: e.importe === null ? null : Number(e.importe), importe_retenido: e.importe_retenido === null ? null : Number(e.importe_retenido) })) as Parameters<typeof calcularPyg>[1];
+  const fa = facturas.map((f) => ({ evento_id: f.evento_id as string | null, importe: Number(f.importe), estado: String(f.estado), fecha_emision: f.fecha_emision as string | null, tipo: f.tipo as string | null, descripcion: f.descripcion as string | null }));
   const ga = gastos.map((g) => ({ evento_id: g.evento_id as string | null, base: Number(g.base), fecha: String(g.fecha), categoria: g.categoria as string | null }));
   const filas: Fila[] = [];
   for (let anio = 2026; anio <= Number(fechaMadrid(ahora).slice(0, 4)); anio++) {

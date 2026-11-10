@@ -8,12 +8,56 @@
 //   · IS: 15 % hasta 2027 y 25 % desde 2028, sobre el beneficio acumulado del año.
 
 import type { EventoRentabilidad, FacturaRentabilidad } from "@/lib/rentabilidad";
+import { leerMaterial, type Cantidades } from "@/lib/material";
 
 const redondear = (n: number) => Math.round(n * 100) / 100;
 export const CATEGORIA_CAPEX = "material_carpas";
 export const CATEGORIA_DIRECTOR = "director";
 
-export type EventoPyg = EventoRentabilidad & { tipo_evento: string | null };
+export type EventoPyg = EventoRentabilidad & { tipo_evento: string | null; material?: string | null; cantidades?: Cantidades };
+
+// Ingresos por producto, con las categorías del Excel contable (en este orden)
+export const CATEGORIAS_INGRESO = [
+  "Carpas beduinas", "Carpas beduinas + guirnaldas", "Carpas modulares", "Carpas beduinas + Carpas modulares", "Tarima",
+  "Carpas modulares + Tarima", "Carpas beduinas + Tarima", "Carpas beduinas + Carpas modulares + Tarima",
+  "Carpas beduinas + Tarima + Guirnaldas + Vegetación", "Sombrillas", "Comisión", "Alquiler", "Reserva",
+];
+const normal = (s: string | null | undefined) => (s ?? "").normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+
+// A qué categoría va cada factura (como en el Excel): las de reserva a "Reserva", las mensualidades
+// a "Alquiler" y el resto según lo que cobra su descripción ("Tarima 64 m2"); si la descripción
+// no dice nada de material, según el material del evento.
+export type FacturaCategoria = { tipo?: string | null; descripcion?: string | null };
+export function categoriaIngreso(e: EventoPyg | undefined, f: FacturaCategoria = {}): string {
+  if (f.tipo === "reserva" || e?.estado === "cancelado_reserva_retenida") return "Reserva";
+  if (f.tipo === "mensualidad") return "Alquiler";
+  const d = normal(f.descripcion);
+  if (/comision/.test(d)) return "Comisión";
+  const desc = categoriaMaterial(d, leerMaterial(f.descripcion));
+  if (desc) return desc;
+  if (/alquiler/.test(d)) return "Alquiler";
+  if (!e) return "Otros";
+  const t = normal(e.material);
+  if (/comision/.test(t)) return "Comisión";
+  if (e.es_larga_duracion) return "Alquiler";
+  return categoriaMaterial(t, e.cantidades ?? leerMaterial(e.material)) ?? "Otros";
+}
+
+function categoriaMaterial(t: string, c: Cantidades): string | null {
+  const [b, m, ta, s] = [c.beduinas > 0, c.modulares > 0, c.tarima_m2 > 0, c.sombrillas > 0];
+  const guirnaldas = /guirnald/.test(t), vegetacion = /vegetac/.test(t);
+  if (b && ta && (guirnaldas || vegetacion)) return "Carpas beduinas + Tarima + Guirnaldas + Vegetación";
+  if (b && m && ta) return "Carpas beduinas + Carpas modulares + Tarima";
+  if (b && m) return "Carpas beduinas + Carpas modulares";
+  if (m && ta) return "Carpas modulares + Tarima";
+  if (b && ta) return "Carpas beduinas + Tarima";
+  if (b && guirnaldas) return "Carpas beduinas + guirnaldas";
+  if (b) return "Carpas beduinas";
+  if (m) return "Carpas modulares";
+  if (ta) return "Tarima";
+  if (s) return "Sombrillas";
+  return null;
+}
 export type GastoPyg = { evento_id: string | null; base: number; fecha: string; categoria: string | null };
 export type Activo = { id: string; nombre: string; coste: number; vida_anios: number; fecha_compra: string; cuota_manual: number | null };
 export type Manual = { mes: string; concepto: "director" | "bonus" | "intereses"; importe: number };
@@ -60,7 +104,7 @@ export function cuotaActivo(a: Activo, mes: string): number {
 
 export const tipoImpuesto = (anio: number) => (anio <= 2027 ? 0.15 : 0.25);
 
-export function calcularPyg(anio: number, eventos: EventoPyg[], gastos: GastoPyg[], facturas: FacturaRentabilidad[], activos: Activo[], manual: Manual[], nombres: Nombres): Pyg {
+export function calcularPyg(anio: number, eventos: EventoPyg[], gastos: GastoPyg[], facturas: (FacturaRentabilidad & FacturaCategoria)[], activos: Activo[], manual: Manual[], nombres: Nombres): Pyg {
   const delAnio = (fecha: string | null) => Boolean(fecha?.startsWith(`${anio}-`));
   const indice = (fecha: string) => Number(fecha.slice(5, 7)) - 1;
   const grupos = () => new Map<string, number[]>();
@@ -72,10 +116,10 @@ export function calcularPyg(anio: number, eventos: EventoPyg[], gastos: GastoPyg
   const sueldo = ceros();
   const nombreCategoria = (c: string | null) => (c ? nombres.categorias.get(c)?.nombre ?? c : "Sin categoría");
 
-  const tipoDe = new Map(eventos.map((e) => [e.id, e.tipo_evento]));
+  const deEvento = new Map(eventos.map((e) => [e.id, e]));
   for (const f of facturas) {
     if (f.estado === "prevista" || !delAnio(f.fecha_emision)) continue;
-    sumar(ingresos, (f.evento_id && tipoDe.get(f.evento_id)) || "otro", indice(f.fecha_emision!), f.importe);
+    sumar(ingresos, categoriaIngreso(f.evento_id ? deEvento.get(f.evento_id) : undefined, f), indice(f.fecha_emision!), f.importe);
   }
 
   for (const g of gastos) {
@@ -94,7 +138,10 @@ export function calcularPyg(anio: number, eventos: EventoPyg[], gastos: GastoPyg
     return m;
   };
 
-  const porTipo = aFilas(ingresos, (c) => nombres.tiposEvento.get(c) ?? (c === "otro" ? "Sin tipo" : c));
+  // Todas las categorías del Excel, en su orden (aunque estén a cero), y "Otros" si hay
+  const porTipo = [...CATEGORIAS_INGRESO, "Otros"]
+    .map((c) => fila(c, c, ingresos.get(c) ?? ceros()))
+    .filter((f) => f.clave !== "Otros" || f.meses.some((x) => x));
   const porVariable = aFilas(variables, (c) => (c === "sin" ? "Sin categoría" : nombreCategoria(c)));
   const porFijo = aFilas(fijos, (c) => (c === "sin" ? "Sin categoría" : nombreCategoria(c)));
   const tIngresos = total("ingresos", "Ingresos", porTipo);
