@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
-import { ChevronDown, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Download, Plus } from "lucide-react";
 import { Cabecera } from "@/components/cabecera";
 import { Campo } from "@/components/campo";
 import { Button } from "@/components/ui/button";
@@ -122,6 +122,9 @@ export function PantallaPyg({ esAdmin }: { esAdmin: boolean }) {
           <span className="px-1 font-medium">{anio}</span>
           <Button variant="ghost" size="sm" aria-label="Año siguiente" onClick={() => setAnio(anio + 1)}><ChevronRight className="size-4" /></Button>
         </div>
+        <Button variant="outline" render={<a href={`/api/finanzas/pyg?anio=${anio}`} download />}>
+          <Download className="size-4" aria-hidden /> Descargar en Excel
+        </Button>
       </Cabecera>
       <PestanasFinanzas activa="pyg" />
 
