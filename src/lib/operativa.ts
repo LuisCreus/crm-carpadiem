@@ -171,9 +171,13 @@ export function calcularAvisos(
       const desde = diaDe(p.seguimiento_desde)!;
       const toca = sumarDias(desde, ajustes.diasSeguimiento);
       if (toca <= hoy) {
+        // Enviado y sin novedades desde ese día: "Enviado el 17/11 · sin respuesta"
+        const enviado = p.estado === "pendiente" && diaDe(p.enviado_at) === desde;
         avisos.push({
           tipo: "seguimiento", fecha: toca, titulo: `${p.codigo} · ${p.cliente}`, href: `/presupuestos/${p.id}`, urgente: true, presupuestoId: p.id,
-          detalle: `${p.estado === "borrador" ? "Borrador" : "Pendiente"} sin cambios desde el ${formatoCorto(desde)} · escribe al cliente`,
+          detalle: enviado
+            ? `Enviado el ${formatoCorto(desde)} · sin respuesta · escribe al cliente`
+            : `${p.estado === "borrador" ? "Borrador" : "Pendiente"} sin cambios desde el ${formatoCorto(desde)} · escribe al cliente`,
         });
       }
       continue;

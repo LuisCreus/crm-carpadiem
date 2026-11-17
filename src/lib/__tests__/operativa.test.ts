@@ -88,6 +88,17 @@ describe("avisos del Inicio", () => {
     expect(a[0].detalle).toMatch(/Borrador sin cambios desde el/);
   });
 
+  it("enviado y sin respuesta: el recordatorio sale a la semana del día del envío", () => {
+    const datos = {
+      presupuestos: [{ id: "078", codigo: "CD 078", cliente: "Montse", estado: "pendiente" as const, enviado_at: "2026-11-17T17:00:00Z", seguimiento_desde: "2026-11-17T17:00:00Z" }],
+      eventos: [], leads: [],
+    };
+    expect(calcularAvisos("2026-11-23", datos, ajustes)).toEqual([]); // todavía no
+    const a = calcularAvisos("2026-11-24", datos, ajustes);
+    expect(a.map((x) => [x.titulo, x.fecha, x.presupuestoId])).toEqual([["CD 078 · Montse", "2026-11-24", "078"]]);
+    expect(a[0].detalle).toMatch(/^Enviado el .+ · sin respuesta · escribe al cliente$/);
+  });
+
   it("montaje mañana, plazo de seguro y cobro pendiente tras el evento", () => {
     const a = calcularAvisos("2026-10-28", {
       presupuestos: [], leads: [],

@@ -82,6 +82,29 @@ describe("enviar, aceptar y opciones", () => {
     expect(rows[0].enviado_at).not.toBeNull();
   });
 
+  it("marcar como enviado con el día del envío: se guarda ese día y el seguimiento cuenta desde entonces", async () => {
+    const p = await crear(BASE);
+    await como(() => db.query("select public.marcar_enviado($1, 1, '2026-01-10')", [p.id]));
+    const dias = async () => (await db.query<{ estado: string; envio: string; seguimiento: string; version: string }>(
+      `select p.estado, (p.enviado_at at time zone 'Europe/Madrid')::date::text envio,
+              (p.seguimiento_desde at time zone 'Europe/Madrid')::date::text seguimiento,
+              (v.enviado_at at time zone 'Europe/Madrid')::date::text "version"
+         from public.presupuestos p join public.presupuesto_versiones v on v.presupuesto_id = p.id and v.version = 1
+        where p.id = $1`, [p.id])).rows[0];
+    expect(await dias()).toEqual({ estado: "pendiente", envio: "2026-01-10", seguimiento: "2026-01-10", version: "2026-01-10" });
+
+    // Se puede corregir la fecha; una fecha futura no se admite
+    await como(() => db.query("select public.marcar_enviado($1, 1, '2026-01-12')", [p.id]));
+    expect(await dias()).toMatchObject({ envio: "2026-01-12", seguimiento: "2026-01-12" });
+    await expect(como(() => db.query("select public.marcar_enviado($1, 1, (now() + interval '2 days')::date)", [p.id]))).rejects.toThrow(/posterior a hoy/);
+
+    // Sin fecha (botón de arriba) o con la de hoy: ahora mismo
+    await como(() => db.query("select public.marcar_enviado($1, 1)", [p.id]));
+    const { rows } = await db.query<{ hoy: boolean }>(
+      "select (enviado_at at time zone 'Europe/Madrid')::date = (now() at time zone 'Europe/Madrid')::date and seguimiento_desde = enviado_at as hoy from public.presupuestos where id = $1", [p.id]);
+    expect(rows[0].hoy).toBe(true);
+  });
+
   it("aceptar crea el evento y descarta las demás opciones", async () => {
     const a = await crear(BASE);
     const b = await crear({ ...BASE, cliente_id: a.cliente_id, oportunidad_id: a.oportunidad_id, contactos: [] });

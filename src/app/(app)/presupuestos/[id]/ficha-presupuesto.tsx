@@ -9,6 +9,8 @@ import { Copy, Mail, MessageCircle, Phone, Plus, Share2, Trash2 } from "lucide-r
 import { EtiquetaEstado, Etiqueta, CLASE_CONFIRMADO, CLASE_SEGURO } from "@/components/etiqueta-estado";
 import { HistorialDialogo } from "@/components/historial-dialogo";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Campo } from "@/components/campo";
 import { useTablaEnVivo } from "@/hooks/use-tabla-en-vivo";
 import { nombreDe, useListas } from "@/hooks/use-listas";
 import { crearClienteNavegador } from "@/lib/supabase/client";
@@ -17,7 +19,8 @@ import {
   CONCEPTOS_COBRO, SELECT_PRESUPUESTO, SELECT_PRESUPUESTO_LISTA, uno,
   type Cobro, type Contacto, type Presupuesto, type PresupuestoLista, type Version,
 } from "@/lib/datos/tipos";
-import { formatoEuros, formatoFecha, formatoFechaHora, formatoPorcentaje, leerEuros } from "@/lib/formato";
+import { formatoEuros, formatoFecha, formatoPorcentaje, hoyMadrid, leerEuros } from "@/lib/formato";
+import { diaDe, sumarDias } from "@/lib/operativa";
 import {
   ESTADOS, ESTADOS_ACEPTADOS, ESTADOS_MANUALES, diaSemana, importeReserva,
   textoFechaEvento, type EstadoPresupuesto,
@@ -37,6 +40,7 @@ type Datos = {
   contactos: Contacto[];
   opciones: PresupuestoLista[];
   evento: { id: string; modalidad: "confirmado" | "seguro"; estado: string } | null;
+  diasSeguimiento: number;
 };
 
 function Tarjeta({ titulo, accion, children }: { titulo: string; accion?: ReactNode; children: ReactNode }) {
@@ -65,6 +69,70 @@ const telefonoWhatsapp = (tel: string) => {
   return limpio.length === 9 ? `34${limpio}` : limpio;
 };
 
+// Envío: se marca aquí con el día en que se envió. Si pasan los días de seguimiento (Ajustes) y
+// el presupuesto sigue sin respuesta, sale un recordatorio en Inicio para escribir al cliente.
+function TarjetaEnvio({ p, ultimaVersion, dias, marcar }: {
+  p: Presupuesto; ultimaVersion: number; dias: number; marcar: (fecha: string) => Promise<void>;
+}) {
+  const hoy = hoyMadrid();
+  const enviadoEl = diaDe(p.enviado_at);
+  const [fecha, setFecha] = useState(hoy);
+  const [cambiando, setCambiando] = useState(false);
+  const [ocupado, setOcupado] = useState(false);
+  const v = (n: number | null) => `V${String(n ?? 1).padStart(2, "0")}`;
+  const nuncaEnviado = !p.enviado_at && !p.version_enviada;
+  const otraVersion = Boolean(p.version_enviada) && p.version_enviada !== ultimaVersion; // hay una versión más nueva sin enviar
+  const conFila = !p.enviado_at || otraVersion || cambiando;
+  const enEspera = p.estado === "borrador" || p.estado === "pendiente";
+  // Día del recordatorio: N días sin cambios (los presupuestos antiguos, N días después del envío)
+  const desde = p.seguimiento_desde ? diaDe(p.seguimiento_desde) : p.estado === "pendiente" ? enviadoEl : null;
+  const toca = desde && enEspera ? sumarDias(desde, dias) : null;
+
+  async function guardar() {
+    setOcupado(true);
+    await marcar(fecha);
+    setOcupado(false);
+    setCambiando(false);
+  }
+
+  return (
+    <Tarjeta titulo="Envío" accion={p.enviado_at && !conFila && (
+      <Button variant="outline" size="sm" onClick={() => { setFecha(enviadoEl ?? hoy); setCambiando(true); }}>Cambiar fecha</Button>
+    )}>
+      {p.enviado_at ? (
+        <p className="text-sm">{v(p.version_enviada)} enviada el {formatoFecha(enviadoEl)}</p>
+      ) : p.version_enviada ? (
+        <p className="text-sm text-muted-foreground">{v(p.version_enviada)} enviada (importado del Excel, sin fecha de envío).</p>
+      ) : (
+        <p className="text-sm text-muted-foreground">Todavía no se ha enviado. Envíalo por Outlook y márcalo aquí con el día en que lo enviaste.</p>
+      )}
+      {p.enviado_at && toca && (
+        <p className="mt-1 text-[13px] text-muted-foreground">
+          {toca > hoy
+            ? `Si sigue sin respuesta, el ${formatoFecha(toca)} saldrá un recordatorio en Inicio para escribir al cliente.`
+            : "Sigue sin respuesta: tienes el recordatorio en Inicio para escribir al cliente."}
+        </p>
+      )}
+      {conFila && (
+        <div className="mt-3 flex flex-wrap items-end gap-2">
+          <Campo id="envio-fecha" etiqueta="Fecha de envío">
+            <Input id="envio-fecha" type="date" className="w-40" max={hoy} value={fecha} onChange={(e) => setFecha(e.target.value)} />
+          </Campo>
+          <Button variant={nuncaEnviado && enEspera ? "default" : "outline"} disabled={ocupado || !fecha || fecha > hoy} onClick={guardar}>
+            {cambiando && !otraVersion ? "Guardar fecha" : nuncaEnviado ? "Marcar como enviado" : `Marcar ${v(ultimaVersion)} como enviada`}
+          </Button>
+          {cambiando && <Button variant="ghost" onClick={() => setCambiando(false)}>Cancelar</Button>}
+        </div>
+      )}
+      {nuncaEnviado && enEspera && (
+        <p className="mt-2 text-[13px] text-muted-foreground">
+          {p.estado === "borrador" ? "Al marcarlo pasa a Pendiente. " : ""}Si en {dias} días sigue sin respuesta, saldrá un recordatorio en Inicio para escribir al cliente.
+        </p>
+      )}
+    </Tarjeta>
+  );
+}
+
 export function FichaPresupuesto({ id }: { id: string }) {
   const soloLectura = useSoloLectura();
   const router = useRouter();
@@ -79,7 +147,7 @@ export function FichaPresupuesto({ id }: { id: string }) {
       const { data: p, error } = await sb.from("presupuestos").select(SELECT_PRESUPUESTO).eq("id", id).maybeSingle();
       if (error) throw new Error(error.message);
       if (!p) return [];
-      const [v, c, ct, op, ev] = await Promise.all([
+      const [v, c, ct, op, ev, aj] = await Promise.all([
         sb.from("presupuesto_versiones").select("*").eq("presupuesto_id", id).is("deleted_at", null).order("version", { ascending: false }),
         sb.from("cobros").select("id, fecha, importe, concepto, notas").eq("presupuesto_id", id).is("deleted_at", null).order("fecha"),
         sb.from("contactos").select("id, nombre, rol, telefono, email").eq("cliente_id", p.cliente_id).is("deleted_at", null).order("orden"),
@@ -87,6 +155,7 @@ export function FichaPresupuesto({ id }: { id: string }) {
           ? sb.from("presupuestos").select(SELECT_PRESUPUESTO_LISTA).eq("oportunidad_id", p.oportunidad_id).is("deleted_at", null).order("numero")
           : Promise.resolve({ data: [] }),
         sb.from("eventos").select("id, modalidad, estado").eq("presupuesto_id", id).is("deleted_at", null).maybeSingle(),
+        sb.from("ajustes").select("dias_seguimiento").maybeSingle(),
       ]);
       return [{
         p: { ...p, cliente: uno(p.cliente), comercial: uno(p.comercial), intermediario: uno(p.intermediario) } as Presupuesto,
@@ -95,6 +164,7 @@ export function FichaPresupuesto({ id }: { id: string }) {
         contactos: (ct.data ?? []) as Contacto[],
         opciones: (op.data ?? []) as unknown as PresupuestoLista[],
         evento: ev.data as Datos["evento"],
+        diasSeguimiento: aj.data?.dias_seguimiento ?? 7,
       }];
     },
   );
@@ -104,7 +174,7 @@ export function FichaPresupuesto({ id }: { id: string }) {
   if (error) return <p role="alert" className="text-sm text-destructive">{error}</p>;
   if (!d) return <p className="text-sm text-muted-foreground">Este presupuesto no existe o está en la papelera.</p>;
 
-  const { p, versiones, cobros, contactos, opciones, evento } = d;
+  const { p, versiones, cobros, contactos, opciones, evento, diasSeguimiento } = d;
   const importe = p.importe !== null ? Number(p.importe) : null;
   const reservaPct = p.reserva_pct !== null ? Number(p.reserva_pct) : null;
   const cobrado = cobros.reduce((s, c) => s + c.importe, 0);
@@ -143,10 +213,11 @@ export function FichaPresupuesto({ id }: { id: string }) {
     else toast.success("Importe guardado ✓");
   }
 
-  async function marcarEnviado() {
-    const { error } = await sb.rpc("marcar_enviado", { p_id: p.id, p_version: ultimaVersion });
+  // Con el día del envío (tarjeta «Envío») o, sin fecha, hoy (botón de arriba)
+  async function marcarEnviado(fecha?: string) {
+    const { error } = await sb.rpc("marcar_enviado", { p_id: p.id, p_version: ultimaVersion, ...(fecha ? { p_fecha: fecha } : {}) });
     if (error) toast.error(error.message);
-    else toast.success(`V${String(ultimaVersion).padStart(2, "0")} marcada como enviada ✓`);
+    else toast.success(`V${String(ultimaVersion).padStart(2, "0")} marcada como enviada el ${formatoFecha(fecha ?? hoyMadrid())} ✓`);
   }
 
   async function borrarCobro(c: Cobro) {
@@ -174,7 +245,7 @@ export function FichaPresupuesto({ id }: { id: string }) {
 
   // Acción principal según el estado
   const principal =
-    p.estado === "borrador" ? <Button onClick={marcarEnviado}>Marcar como enviado</Button>
+    p.estado === "borrador" ? <Button onClick={() => marcarEnviado()}>Marcar como enviado</Button>
     : p.estado === "pendiente" || p.estado === "caducado" ? <Button onClick={() => setDialogo("aceptar")}>Aceptar</Button>
     : aceptado && evento ? <Button render={<Link href={`/eventos/${evento.id}`} />}>Ver evento y facturas</Button>
     : null;
@@ -318,15 +389,7 @@ export function FichaPresupuesto({ id }: { id: string }) {
             )}
           </Tarjeta>
 
-          <Tarjeta titulo="Envío" accion={p.estado !== "borrador" && <Button variant="outline" size="sm" onClick={marcarEnviado}>Marcar V{String(ultimaVersion).padStart(2, "0")} como enviada</Button>}>
-            {p.enviado_at ? (
-              <p className="text-sm">V{String(p.version_enviada).padStart(2, "0")} marcada como enviada el {formatoFechaHora(p.enviado_at)}</p>
-            ) : p.version_enviada ? (
-              <p className="text-sm text-muted-foreground">V{String(p.version_enviada).padStart(2, "0")} enviada (importado del Excel, sin fecha de envío).</p>
-            ) : (
-              <p className="text-sm text-muted-foreground">Todavía no se ha enviado. Envíalo por Outlook y pulsa “Marcar como enviado”.</p>
-            )}
-          </Tarjeta>
+          <TarjetaEnvio p={p} ultimaVersion={ultimaVersion} dias={diasSeguimiento} marcar={marcarEnviado} />
 
           {evento && (
             <Tarjeta titulo="Evento">
