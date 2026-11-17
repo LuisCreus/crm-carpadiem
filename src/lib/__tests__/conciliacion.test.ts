@@ -53,3 +53,20 @@ describe("revisión: casos límite", () => {
     expect(proponer({ id: "m", fecha: "2026-11-01", concepto: "Pago Fra. Cd2026/5", importe: 121 }, fs, [], [])).toMatchObject({ factura: { id: "e5" }, seguro: true });
   });
 });
+
+describe("remesas de transferencias", () => {
+  const f = (id: string, total: number, remesa_id: string | null, estado = "pagada"): RecibidaC => ({ id, numero: null, total, estado, proveedor: `Proveedor ${id}`, fecha: "2026-11-01", remesa_id });
+  const recibidas = [f("a", 307.4, "r1"), f("b", 665.5, "r1"), f("c", 972.9, null, "pendiente"), f("d", 506.98, "r2")];
+  const mov = { id: "m", fecha: "2026-11-05", concepto: "Remesa De Transferencias", importe: -972.9 };
+
+  it("un solo cargo por la suma de las facturas del fichero", () => {
+    const p = proponer(mov, [], recibidas, []);
+    expect(p).toMatchObject({ tipo: "remesa", seguro: true });
+    expect(p?.tipo === "remesa" && p.remesa.recibidas.map((x) => x.id)).toEqual(["a", "b"]);
+  });
+
+  it("si la remesa ya está conciliada, no se propone otra vez; la de una sola factura va como pago normal", () => {
+    expect(proponer(mov, [], recibidas, [], new Set(["r1"]))).toMatchObject({ tipo: "pago", recibida: { id: "c" } });
+    expect(proponer({ ...mov, importe: -506.98 }, [], recibidas, [])).toMatchObject({ tipo: "pago", recibida: { id: "d" } });
+  });
+});

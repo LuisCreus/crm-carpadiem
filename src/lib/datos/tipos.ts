@@ -202,6 +202,7 @@ export type FacturaRecibida = {
   estado: "pendiente" | "pagada";
   fecha_pago: string | null;
   fichero_pago_at: string | null;
+  remesa_id: string | null;
   archivo_item_id: string | null;
   archivo_nombre: string | null;
   comentarios: string | null;
@@ -210,7 +211,7 @@ export type FacturaRecibida = {
 };
 
 export const SELECT_FACTURA_RECIBIDA =
-  "id, proveedor_id, numero, fecha, vencimiento, concepto, evento_id, categoria, base, iva_pct, irpf_pct, total, iban, estado, fecha_pago, fichero_pago_at, archivo_item_id, archivo_nombre, comentarios, proveedor:proveedores(id, nombre, nif), evento:eventos(id, fecha_inicio, cliente:clientes(nombre))";
+  "id, proveedor_id, numero, fecha, vencimiento, concepto, evento_id, categoria, base, iva_pct, irpf_pct, total, iban, estado, fecha_pago, fichero_pago_at, remesa_id, archivo_item_id, archivo_nombre, comentarios, proveedor:proveedores(id, nombre, nif), evento:eventos(id, fecha_inicio, cliente:clientes(nombre))";
 
 export function aFacturaRecibida(f: Record<string, unknown>): FacturaRecibida {
   const ev = uno(f.evento) as (FacturaRecibida["evento"] & { cliente: unknown }) | null;

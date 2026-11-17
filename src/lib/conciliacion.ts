@@ -6,12 +6,20 @@
 
 export type MovimientoC = { id: string; fecha: string; concepto: string; importe: number };
 export type EmitidaC = { id: string; codigo: string | null; anio: number | null; numero: number | null; total: number; estado: string; cliente: string | null };
-export type RecibidaC = { id: string; numero: string | null; total: number; estado: string; proveedor: string | null; fecha: string };
+export type RecibidaC = { id: string; numero: string | null; total: number; estado: string; proveedor: string | null; fecha: string; remesa_id?: string | null; fichero_pago_at?: string | null };
+// Remesa: las facturas que se pagaron con un mismo fichero. El banco la cobra en un solo cargo por el total.
+export type RemesaC = { id: string; recibidas: RecibidaC[]; total: number; fecha: string | null };
+export function remesasDe(recibidas: RecibidaC[]): RemesaC[] {
+  const grupos = new Map<string, RecibidaC[]>();
+  for (const f of recibidas) if (f.remesa_id) grupos.set(f.remesa_id, [...(grupos.get(f.remesa_id) ?? []), f]);
+  return [...grupos].map(([id, fs]) => ({ id, recibidas: fs, total: Math.round(fs.reduce((s, f) => s + f.total, 0) * 100) / 100, fecha: fs[0].fichero_pago_at ?? null }));
+}
 export type ReglaC = { id: string; patron: string; categoria: string | null; proveedor_id: string | null; ignorar: boolean };
 
 export type Propuesta =
   | { tipo: "cobro"; factura: EmitidaC; seguro: boolean }
   | { tipo: "pago"; recibida: RecibidaC; seguro: boolean }
+  | { tipo: "remesa"; remesa: RemesaC; seguro: boolean }
   | { tipo: "regla"; regla: ReglaC }
   | null;
 
@@ -58,6 +66,12 @@ export function proponer(
     const r = mejor(emitidas.filter((f) => f.estado !== "prevista" && !yaUsadas.has(f.id) && mismoImporte(f.total, m.importe)), (f) => puntosEmitida(concepto, f), "emitida");
     if (r) return { tipo: "cobro", factura: r.elegida, seguro: r.seguro };
   } else {
+    // Una remesa de varias facturas: un solo cargo por la suma
+    const remesas = remesasDe(recibidas).filter((x) => x.recibidas.length > 1 && !yaUsadas.has(x.id) && mismoImporte(x.total, m.importe));
+    if (remesas.length) {
+      const pendiente = remesas.find((x) => x.recibidas.some((f) => f.estado === "pendiente")) ?? remesas[0];
+      return { tipo: "remesa", remesa: pendiente, seguro: concepto.includes("REMESA") || remesas.length === 1 };
+    }
     const r = mejor(recibidas.filter((f) => !yaUsadas.has(f.id) && mismoImporte(f.total, m.importe)), (f) => puntosRecibida(concepto, f), "pendiente");
     if (r) return { tipo: "pago", recibida: r.elegida, seguro: r.seguro };
   }

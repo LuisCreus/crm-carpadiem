@@ -44,7 +44,7 @@ export function DialogoPagoBanco({ facturas, cerrar, alTerminar }: { facturas: F
       enlace.click();
       setTimeout(() => URL.revokeObjectURL(enlace.href), 10_000);
       const { error } = await crearClienteNavegador().from("facturas_recibidas")
-        .update({ fichero_pago_at: new Date().toISOString() }).in("id", buenas.map((t) => t.id));
+        .update({ fichero_pago_at: new Date().toISOString(), remesa_id: crypto.randomUUID() }).in("id", buenas.map((t) => t.id)); // la remesa: el banco la cobra en un solo cargo
       if (error) throw new Error(error.message);
       setPaso("subir");
     } catch (e) {

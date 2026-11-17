@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { nombreDe, useListas } from "@/hooks/use-listas";
 import { useTablaEnVivo } from "@/hooks/use-tabla-en-vivo";
 import type { DatosLeidos } from "@/lib/leer-factura";
-import { patronSugerido, proponer, type EmitidaC, type Propuesta, type RecibidaC, type ReglaC } from "@/lib/conciliacion";
+import { patronSugerido, proponer, remesasDe, type EmitidaC, type Propuesta, type RecibidaC, type ReglaC, type RemesaC } from "@/lib/conciliacion";
 import { SELECT_FACTURA_RECIBIDA, aFacturaRecibida, uno } from "@/lib/datos/tipos";
 import { totalFactura } from "@/lib/facturacion";
 import { formatoEuros, formatoFecha } from "@/lib/formato";
@@ -27,7 +27,7 @@ import { useSoloLectura } from "@/components/usuario";
 
 type MovimientoBanco = {
   id: string; fecha: string; concepto: string; importe: number; saldo: number | null;
-  estado: "pendiente" | "conciliado" | "ignorado"; factura_id: string | null; factura_recibida_id: string | null; notas: string | null;
+  estado: "pendiente" | "conciliado" | "ignorado"; factura_id: string | null; factura_recibida_id: string | null; remesa_id: string | null; notas: string | null;
 };
 type Datos = { movimientos: MovimientoBanco[]; emitidas: EmitidaC[]; recibidas: RecibidaC[]; reglas: ReglaC[] };
 
@@ -47,7 +47,7 @@ export function PantallaBanco() {
 
   const { datos, cargando } = useTablaEnVivo<Datos>(["movimientos_banco", "reglas_banco", "facturas", "facturas_recibidas"], async (sb) => {
     const [m, e, r, g] = await Promise.all([
-      leerTodo((desde, hasta) => sb.from("movimientos_banco").select("id, fecha, concepto, importe, saldo, estado, factura_id, factura_recibida_id, notas")
+      leerTodo((desde, hasta) => sb.from("movimientos_banco").select("id, fecha, concepto, importe, saldo, estado, factura_id, factura_recibida_id, remesa_id, notas")
         .order("fecha", { ascending: false }).order("created_at", { ascending: false }).order("id").range(desde, hasta))
         .then((data) => ({ data, error: null }), (e: Error) => ({ data: null, error: { message: e.message } })),
       sb.from("facturas").select("id, codigo, anio, numero, importe, iva_pct, suplidos, estado, fact_nombre, cliente:clientes(nombre)")
@@ -65,7 +65,7 @@ export function PantallaBanco() {
         cliente: f.fact_nombre ?? (uno(f.cliente) as { nombre: string } | null)?.nombre ?? null,
       })),
       recibidas: (r.data ?? []).map(aFacturaRecibida).map((f) => ({
-        id: f.id, numero: f.numero, total: f.total, estado: f.estado, proveedor: f.proveedor?.nombre ?? null, fecha: f.fecha,
+        id: f.id, numero: f.numero, total: f.total, estado: f.estado, proveedor: f.proveedor?.nombre ?? null, fecha: f.fecha, remesa_id: f.remesa_id, fichero_pago_at: f.fichero_pago_at,
       })),
       reglas: (g.data ?? []) as ReglaC[],
     }];
@@ -74,12 +74,13 @@ export function PantallaBanco() {
 
   // Propuesta de cada movimiento por revisar. Del más antiguo al más nuevo, sin repetir factura.
   const propuestas = useMemo(() => {
-    const usadas = new Set(movimientos.flatMap((m) => [m.factura_id, m.factura_recibida_id].filter((x): x is string => Boolean(x))));
+    const usadas = new Set(movimientos.flatMap((m) => [m.factura_id, m.factura_recibida_id, m.remesa_id].filter((x): x is string => Boolean(x))));
     const res = new Map<string, Propuesta>();
     for (const m of [...movimientos].reverse().filter((x) => x.estado === "pendiente")) {
       const p = proponer(m, emitidas, recibidas, reglas, usadas);
       if (p?.tipo === "cobro") usadas.add(p.factura.id);
       if (p?.tipo === "pago") usadas.add(p.recibida.id);
+      if (p?.tipo === "remesa") usadas.add(p.remesa.id);
       res.set(m.id, p);
     }
     return res;
@@ -88,7 +89,13 @@ export function PantallaBanco() {
   const lista = movimientos.filter((m) => filtro === "todos" || m.estado === filtro);
   const pendientes = movimientos.filter((m) => m.estado === "pendiente");
   const ultimo = movimientos.find((m) => m.saldo !== null);
+  const remesas = useMemo(() => remesasDe(recibidas), [recibidas]);
+  const textoRemesa = (r: RemesaC) => `Remesa de ${r.recibidas.length} facturas: ${r.recibidas.map((f) => f.proveedor ?? "proveedor").join(", ")}`;
   const textoFactura = (m: MovimientoBanco) => {
+    if (m.remesa_id) {
+      const r = remesas.find((x) => x.id === m.remesa_id);
+      return r ? textoRemesa(r) : "Remesa de transferencias";
+    }
     if (m.factura_id) {
       const f = emitidas.find((x) => x.id === m.factura_id);
       return f ? `Cobro ${f.codigo} · ${f.cliente ?? ""}` : "Cobro de factura";
@@ -142,11 +149,23 @@ export function PantallaBanco() {
     toast.success(f.estado === "pendiente" ? "Factura pagada ✓" : "Enlazado ✓");
   }
 
+  // La remesa entera: todas sus facturas quedan pagadas con la fecha del cargo
+  async function conciliarRemesa(m: MovimientoBanco, r: RemesaC) {
+    const porPagar = r.recibidas.filter((f) => f.estado === "pendiente").map((f) => f.id);
+    if (porPagar.length) {
+      const { error } = await sb.from("facturas_recibidas").update({ estado: "pagada", fecha_pago: m.fecha }).in("id", porPagar);
+      if (error) return toast.error(error.message);
+    }
+    const { error } = await sb.from("movimientos_banco").update({ estado: "conciliado", remesa_id: r.id }).eq("id", m.id);
+    if (error) return toast.error(error.message);
+    toast.success(`Remesa conciliada: ${r.recibidas.length} facturas ✓`);
+  }
+
   async function cambiarEstado(m: MovimientoBanco, estado: MovimientoBanco["estado"]) {
-    const cambios = estado === "pendiente" ? { estado, factura_id: null, factura_recibida_id: null, notas: null } : { estado };
+    const cambios = estado === "pendiente" ? { estado, factura_id: null, factura_recibida_id: null, remesa_id: null, notas: null } : { estado };
     const { error } = await sb.from("movimientos_banco").update(cambios).eq("id", m.id);
     if (error) return toast.error(error.message);
-    if (estado === "pendiente" && (m.factura_id || m.factura_recibida_id)) toast.info("Desenlazado. La factura sigue marcada como pagada: cámbialo en la factura si no lo está.");
+    if (estado === "pendiente" && (m.factura_id || m.factura_recibida_id || m.remesa_id)) toast.info("Desenlazado. La factura sigue marcada como pagada: cámbialo en la factura si no lo está.");
   }
 
   return (
@@ -218,6 +237,9 @@ export function PantallaBanco() {
                       <Propuesto seguro={p.seguro} texto={`Factura de ${p.recibida.proveedor ?? "proveedor"}${p.recibida.numero ? ` nº ${p.recibida.numero}` : ""}`}
                         confirmar={() => conciliarPago(m, p.recibida)} />
                     )}
+                    {p?.tipo === "remesa" && (
+                      <Propuesto seguro={p.seguro} texto={textoRemesa(p.remesa)} confirmar={() => conciliarRemesa(m, p.remesa)} />
+                    )}
                     {regla && (regla.ignorar
                       ? <Propuesto seguro texto="Regla: se ignora" confirmar={() => cambiarEstado(m, "ignorado")} />
                       : <Propuesto seguro texto={nombreDe(listas.categoriasGasto, regla.categoria)} accion="Apuntar" confirmar={() => setGasto({ m, regla })} />)}
@@ -238,8 +260,9 @@ export function PantallaBanco() {
 
       {gasto && <DialogoGastoBanco m={gasto.m} regla={gasto.regla} cerrar={() => setGasto(null)} />}
       {enlazar && (
-        <DialogoEnlazar m={enlazar} emitidas={emitidas} recibidas={recibidas}
-          usadas={new Set(movimientos.flatMap((x) => [x.factura_id, x.factura_recibida_id].filter((y): y is string => Boolean(y))))}
+        <DialogoEnlazar m={enlazar} emitidas={emitidas} recibidas={recibidas} remesas={remesas}
+          elegirRemesa={async (r) => { setEnlazar(null); await conciliarRemesa(enlazar, r); }}
+          usadas={new Set(movimientos.flatMap((x) => [x.factura_id, x.factura_recibida_id, x.remesa_id].filter((y): y is string => Boolean(y))))}
           cerrar={() => setEnlazar(null)}
           elegir={async (f) => { setEnlazar(null); await ("codigo" in f ? conciliarCobro(enlazar, f) : conciliarPago(enlazar, f)); }} />
       )}
@@ -259,11 +282,16 @@ function Propuesto({ texto, seguro, confirmar, accion = "Confirmar" }: { texto: 
 }
 
 // Elegir a mano la factura (las de importe más parecido, primero)
-function DialogoEnlazar({ m, emitidas, recibidas, usadas, cerrar, elegir }: {
-  m: { importe: number; concepto: string }; emitidas: EmitidaC[]; recibidas: RecibidaC[]; usadas: Set<string>;
-  cerrar: () => void; elegir: (f: EmitidaC | RecibidaC) => void;
+function DialogoEnlazar({ m, emitidas, recibidas, remesas, usadas, cerrar, elegir, elegirRemesa }: {
+  m: { importe: number; concepto: string }; emitidas: EmitidaC[]; recibidas: RecibidaC[]; remesas: RemesaC[]; usadas: Set<string>;
+  cerrar: () => void; elegir: (f: EmitidaC | RecibidaC) => void; elegirRemesa: (r: RemesaC) => void;
 }) {
   const [todas, setTodas] = useState(false);
+  // Remesas (ficheros de pagos) de varias facturas, las de importe más parecido primero
+  const remesasLibres = m.importe > 0 ? [] : remesas
+    .filter((r) => r.recibidas.length > 1 && !usadas.has(r.id))
+    .sort((a, b) => Math.abs(a.total - Math.abs(m.importe)) - Math.abs(b.total - Math.abs(m.importe)))
+    .slice(0, 5);
   const candidatas: (EmitidaC | RecibidaC)[] = (m.importe > 0 ? emitidas : recibidas)
     .filter((f) => !usadas.has(f.id) && (todas || f.estado === "emitida" || f.estado === "pendiente"))
     .sort((a, b) => Math.abs(a.total - Math.abs(m.importe)) - Math.abs(b.total - Math.abs(m.importe)))
@@ -280,6 +308,21 @@ function DialogoEnlazar({ m, emitidas, recibidas, usadas, cerrar, elegir }: {
           Ver también las ya marcadas como pagadas
         </label>
         {candidatas.length === 0 && <p className="text-sm text-muted-foreground">No hay facturas {m.importe > 0 ? "por cobrar" : "por pagar"}.</p>}
+        {remesasLibres.length > 0 && (
+          <ul className="divide-y rounded-lg border">
+            {remesasLibres.map((r) => (
+              <li key={r.id}>
+                <button type="button" onClick={() => elegirRemesa(r)} className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-muted/40">
+                  <span className="min-w-0 flex-1">
+                    <span className="font-medium">Remesa de {r.recibidas.length} facturas</span>
+                    <span className="text-muted-foreground"> · {r.fecha ? `fichero del ${formatoFecha(r.fecha)} · ` : ""}{r.recibidas.map((f) => f.proveedor ?? "proveedor").join(", ")}</span>
+                  </span>
+                  <span className={cn("tabular-nums", Math.abs(r.total - Math.abs(m.importe)) < 0.01 && "font-medium text-[#25683D]")}>{formatoEuros(r.total)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
         <ul className="divide-y rounded-lg border">
           {candidatas.map((f) => (
             <li key={f.id}>
