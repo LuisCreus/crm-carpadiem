@@ -307,7 +307,7 @@ function DialogoEnlazar({ m, emitidas, recibidas, remesas, usadas, cerrar, elegi
           <input type="checkbox" className="size-4" checked={todas} onChange={(e) => setTodas(e.target.checked)} />
           Ver también las ya marcadas como pagadas
         </label>
-        {candidatas.length === 0 && <p className="text-sm text-muted-foreground">No hay facturas {m.importe > 0 ? "por cobrar" : "por pagar"}.</p>}
+        {candidatas.length === 0 && remesasLibres.length === 0 && <p className="text-sm text-muted-foreground">No hay facturas {m.importe > 0 ? "por cobrar" : "por pagar"}.</p>}
         {remesasLibres.length > 0 && (
           <ul className="divide-y rounded-lg border">
             {remesasLibres.map((r) => (
@@ -323,7 +323,7 @@ function DialogoEnlazar({ m, emitidas, recibidas, remesas, usadas, cerrar, elegi
             ))}
           </ul>
         )}
-        <ul className="divide-y rounded-lg border">
+        <ul className={cn("divide-y rounded-lg border", !candidatas.length && "hidden")}>
           {candidatas.map((f) => (
             <li key={f.id}>
               <button type="button" onClick={() => elegir(f)} className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-muted/40">
