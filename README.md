@@ -24,8 +24,8 @@ CRM web de CARPADIEM IBÉRICA S.L. para gestionar leads, presupuestos (con la pl
 | 14 | Facturas recibidas de proveedores (gastos por evento o generales) → PENDIENTE SARA/02. RECIBIDAS | Hecha |
 | 15 | Pagos a proveedores: fichero SEPA XML para Santander Empresas; Contactos (proveedores + intermediarios) | Hecha |
 | 16 | Rentabilidad por evento (mes a mes) y «Pasar a la gestoría» por trimestre (mueve PDF, Excel resumen, borrador en Outlook) | Hecha |
-| 17 | Conciliar con el banco: se sube el extracto del Santander (Norma 43, Excel o CSV) y cada movimiento se enlaza con su factura, se apunta como gasto (con reglas que se recuerdan) o se ignora | Hecha |
-| 18 | Finanzas: P&L por fecha de factura (lo facturado y lo que nos facturan cada mes), por tipo de evento, costes variables y fijos, personal e intereses a mano, CAPEX con amortización desde la compra, EBITDA, EBIT, IS y beneficio neto | Hecha |
+| 17 | Conciliar con el banco: se sube el extracto del Santander (Norma 43, Excel o CSV) y cada movimiento se enlaza con su factura, se apunta como gasto (con reglas que se recuerdan) o se ignora. Una remesa de transferencias (un solo cargo en el banco) se concilia con todas las facturas de su fichero de pagos | Hecha |
+| 18 | Finanzas: P&L por fecha de factura (lo facturado y lo que nos facturan cada mes), ingresos por categoría de producto (las del Excel contable: cada factura según su tipo y su descripción), costes variables y fijos, personal e intereses a mano, CAPEX con amortización desde la compra, EBITDA, EBIT, IS y beneficio neto | Hecha |
 | Revisión | Seguridad (SharePoint acotado a CARPA DIEM, solo Microsoft, facturas y numeración protegidas), cobros sin duplicar, banco más robusto, carga de datos compartida, código «CD 001/27» desde 2027, Finanzas/Banco/Gestoría solo administrador | Hecha |
 
 ## Piezas
